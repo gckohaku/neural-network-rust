@@ -5,4 +5,4 @@ edition = "2024"
 
 [dependencies]
 ndarray = "0.16.1"
-ndarray-linalg = {version = "0.17.0", features = ["openblas-static"]}
+ndarray-linalg = {version = "0.17.0", features = ["openblas"]}
