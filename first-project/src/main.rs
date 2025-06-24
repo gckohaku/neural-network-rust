@@ -1,5 +1,7 @@
+use matrix::*;
+
 fn main() {
-	println!("Hello, world!");
-	// This is a simple Rust program that prints "Hello, world!" to the console.
-	// You can run this program using `cargo run` in your terminal.
+	let mut mat: Matrix = matrix::Matrix::new(2, 3);
+
+	println!("Matrix created with {} rows and {} columns", mat.rows, mat.cols);
 }
