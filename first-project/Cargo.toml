@@ -4,5 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ndarray = "0.16.1"
-ndarray-linalg = {version = "0.17.0", features = ["openblas"]}
+
+[profile.dev]
+opt-level = 1
+overflow-checks = false
+
+[profile.release]
+opt-level = 3

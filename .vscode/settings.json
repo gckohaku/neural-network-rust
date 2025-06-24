@@ -1,3 +1,19 @@
 {
-    "files.autoSave": "off"
+    "files.autoSave": "off",
+    "[rust]": {
+        "editor.defaultFormatter": "rust-lang.rust-analyzer",
+        "editor.insertSpaces": false,
+        "editor.tabSize": 4,
+    },
+    "rust-analyzer.checkOnSave": true,
+    "rust-analyzer.check.command": "mold",
+    "rust-analyzer.check.extraArgs": [
+        "-run",
+        "cargo",
+        "check",
+        "--all-features",
+        "--tests",
+        "--examples"
+    ],
+    "editor.insertSpaces": false,
 }
