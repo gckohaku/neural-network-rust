@@ -6,14 +6,5 @@
         "editor.tabSize": 4,
     },
     "rust-analyzer.checkOnSave": true,
-    "rust-analyzer.check.command": "mold",
-    "rust-analyzer.check.extraArgs": [
-        "-run",
-        "cargo",
-        "check",
-        "--all-features",
-        "--tests",
-        "--examples"
-    ],
     "editor.insertSpaces": false,
 }
