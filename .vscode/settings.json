@@ -7,4 +7,7 @@
     },
     "rust-analyzer.checkOnSave": true,
     "editor.insertSpaces": false,
+    "workbench.editor.wrapTabs": true,
+    "window.density.editorTabHeight": "compact",
+    "editor.wordWrap": "on",
 }
