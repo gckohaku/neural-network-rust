@@ -10,4 +10,8 @@
     "workbench.editor.wrapTabs": true,
     "window.density.editorTabHeight": "compact",
     "editor.wordWrap": "on",
+    "cSpell.words": [
+        "hadamard",
+        "Hadamard"
+    ],
 }
