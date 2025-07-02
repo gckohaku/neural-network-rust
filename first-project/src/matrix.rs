@@ -7,6 +7,13 @@ pub struct Matrix {
     pub data: Vec<f64>,
 }
 
+// 共用型: T または &T を表すジェネリック型
+pub enum RefOrVal<'a, T> {
+    Val(T),
+    Ref(&'a T),
+}
+// TODO: ↑これを使って加算の実装を簡潔にする
+
 impl Matrix {
     pub fn new(rows: usize, cols: usize) -> Matrix {
         Matrix {
@@ -14,6 +21,12 @@ impl Matrix {
             cols,
             data: vec![0.0; rows * cols],
         }
+    }
+
+    pub fn new_and_fill(rows: usize, cols: usize, value: f64) -> Matrix {
+        let mut matrix = Matrix::new(rows, cols);
+        matrix.fill(value);
+        matrix
     }
 
     pub fn new_from_vec(rows: usize, cols: usize, data: Vec<f64>) -> Result<Matrix, String> {
@@ -48,6 +61,14 @@ impl Matrix {
             Ok(())
         } else {
             Err("Index out of bounds".to_string())
+        }
+    }
+
+    pub fn fill(&mut self, value: f64) {
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                self.set(i, j, value).unwrap();
+            }
         }
     }
 
@@ -88,11 +109,11 @@ impl Matrix {
 impl Display for Matrix {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let width = f.width().unwrap();
-        let prec = f.precision().unwrap_or(0);
+        let precision = f.precision().unwrap_or(0);
 
         for i in 0..self.rows {
             for j in 0..self.cols {
-                write!(f, "{:width$.prec$}", self.get(i, j).unwrap(), width = width, prec = prec)?;
+                write!(f, "{:width$.precision$}", self.get(i, j).unwrap(), width = width, precision = precision)?;
             }
             writeln!(f)?;
         }
@@ -158,6 +179,54 @@ impl ops::Add<&Matrix> for &Matrix {
             Ok(result)
         } else {
             Err("Matrices must have the same size for addition".to_string())
+        }
+    }
+}
+
+// Matrix + Result<Matrix, String>
+impl ops::Add<Result<Matrix, String>> for Matrix {
+    type Output = Result<Matrix, String>;
+
+    fn add(self, rhs: Result<Matrix, String>) -> Self::Output {
+        match rhs {
+            Ok(matrix) => self + matrix,
+            Err(e) => Err(e),
+        }
+    }
+}
+
+// Result<Matrix, String> + Matrix
+impl ops::Add<Matrix> for Result<Matrix, String> {
+    type Output = Result<Matrix, String>;  
+
+    fn add(self, rhs: Matrix) -> Self::Output {
+        match self {
+            Ok(matrix) => matrix + rhs,
+            Err(e) => Err(e),
+        }
+    }
+}
+
+// &Matrix + Result<Matrix, String>
+impl ops::Add<Result<Matrix, String>> for &Matrix {
+    type Output = Result<Matrix, String>;
+
+    fn add(self, rhs: Result<Matrix, String>) -> Self::Output {
+        match rhs {
+            Ok(matrix) => self + &matrix,
+            Err(e) => Err(e),
+        }
+    }
+}
+
+// Result<Matrix, String> + &Matrix
+impl ops::Add<&Matrix> for Result<Matrix, String> {
+    type Output = Result<Matrix, String>;
+
+    fn add(self, rhs: &Matrix) -> Self::Output {
+        match self {
+            Ok(matrix) => &matrix + rhs,
+            Err(e) => Err(e),
         }
     }
 }
