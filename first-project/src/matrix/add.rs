@@ -1,6 +1,5 @@
 use std::ops;
 use crate::matrix::Matrix;
-use crate::auto_apply_ops::AutoApplyArithmeticAdd;
 
 // Matrix += Matrix
 impl ops::AddAssign<Matrix> for Matrix {
