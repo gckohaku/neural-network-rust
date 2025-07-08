@@ -12,7 +12,8 @@
     "editor.wordWrap": "on",
     "cSpell.words": [
         "hadamard",
-        "Hadamard"
+        "Hadamard",
+        "relu"
     ],
     "editor.comments.insertSpace": true,
 }

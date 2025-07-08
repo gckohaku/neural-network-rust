@@ -1,6 +1,6 @@
 mod add;
 
-use std::{fmt::{Debug, Display}, ops};
+use std::{fmt::{Debug, Display}, ops, vec};
 
 #[derive(Clone, Debug)]
 pub struct Matrix {
@@ -47,6 +47,16 @@ impl Matrix {
             Some(self.data[row * self.cols + col])
         } else {
             None
+        }
+    }
+
+    pub fn get_row(&self, row: usize) -> Result<Vec<f64>, String> {
+        if row < self.rows {
+            let start = row * self.cols;
+            let end = start + self.cols;
+            Ok(self.data[start..end].to_vec())
+        } else {
+            Err("Row index out of bounds".to_string())
         }
     }
 
@@ -113,6 +123,52 @@ impl Display for Matrix {
             writeln!(f)?;
         }
         Ok(())
+    }
+}
+
+impl ops::Index<(usize, usize)> for Matrix {
+    type Output = f64;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        let (row, col) = index;
+        if row < self.rows && col < self.cols {
+            &self.data[row * self.cols + col]
+        } else {
+            panic!("Index out of bounds");
+        }
+    }
+}
+
+impl ops::IndexMut<(usize, usize)> for Matrix {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        let (row, col) = index;
+        if row < self.rows && col < self.cols {
+            &mut self.data[row * self.cols + col]
+        } else {
+            panic!("Index out of bounds");
+        }
+    }
+}
+
+impl ops::Index<usize> for Matrix {
+    type Output = [f64];
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if index < self.rows {
+            &self.data[index * self.cols..(index + 1) * self.cols]
+        } else {
+            panic!("Row index out of bounds");
+        }
+    }
+}
+
+impl ops::IndexMut<usize> for Matrix {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        if index < self.rows {
+            &mut self.data[index * self.cols..(index + 1) * self.cols]
+        } else {
+            panic!("Row index out of bounds");
+        }
     }
 }
 
