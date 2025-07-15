@@ -13,7 +13,8 @@
     "cSpell.words": [
         "hadamard",
         "Hadamard",
-        "relu"
+        "relu",
+        "xorshift"
     ],
     "editor.comments.insertSpace": true,
 }
