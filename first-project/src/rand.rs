@@ -9,7 +9,7 @@ pub struct Rand {
 }
 
 const MULTIPLIER: u128 = 0x7a5cd86ea68452e3f784a651a38c59b1;
-const ADDER: u128 = 0x2a4e8f94a486e68423bc84d7856d1324;
+const ADDER: u128 = 0x2a4e8f94a486e68423bc84d7856d1323;
 
 fn rotl64(x: u64, k: u8) -> u64 {
     (&x << &k) | (&x >> (64 - &k))
