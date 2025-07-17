@@ -1,41 +1,70 @@
+// ここに権利関係とかライセンスとか
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
+// PCD の XSL-RR での疑似乱数生成
 #[derive(Clone, Debug)]
 pub struct Rand {
-    x: u64,
-    y: u64,
+    state: u128,
 }
 
-fn rotl(x: u64, k: u8) -> u64 {
+const MULTIPLIER: u128 = 0x7a5cd86ea68452e3f784a651a38c59b1;
+const ADDER: u128 = 0x2a4e8f94a486e68423bc84d7856d1324;
+
+fn rotl64(x: u64, k: u8) -> u64 {
     (&x << &k) | (&x >> (64 - &k))
 }
 
-// TODO: xoroshiro128** を使って乱数を生成する
+fn rotr64(x: u64, k: u8) -> u64 {
+    rotl64(x, 64 - k)
+}
+
+fn generate_state_u64(seed: u64) -> u128 {
+    let top_quad_word = u128::from(seed ^ rotr64(seed, 5)) << 64;
+    let bottom_quad_word = u128::from(seed);
+
+    top_quad_word | bottom_quad_word
+}
 
 impl Rand {
-    pub fn new(&mut self) -> Self {
-        let seed = SystemTime::now()
+    pub fn new() -> Self {
+        let seed: u64 = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
 
-        Rand::new_with_seed(seed)
+        Rand::new_with_seed_u64(seed)
     }
 
-    pub fn new_with_seed(seed: u64) -> Self {
-        Self {
-            x: seed,
-            y: rotl(rotl(seed, 32), 37),
-        }
+    pub fn new_with_seed_u64(seed: u64) -> Self {
+        let mut r = Self {
+            state: generate_state_u64(seed),
+        };
+        r.next();
+        r
     }
 
-    pub fn set_seed(&mut self, seed: u64) {
-        self.x = seed;
-		self.y = rotl(rotl(seed, 32), 37);
+    pub fn set_seed_u64(&mut self, seed: u64) {
+        let top_quad_word = u128::from(seed ^ rotr64(seed, 5)) << 64;
+        let bottom_quad_word = u128::from(seed);
+
+        self.state = generate_state_u64(seed);
     }
 
-	// TODO: xoroshiro128** での乱数の生成
-	pub fn next() {
+    pub fn set_seed_u128(&mut self, seed: u128) {
+        self.state = seed;
+    }
 
-	}
+    pub fn next(&mut self) -> u64 {
+        let count: u8 = (self.state >> 122) as u8;
+        let x_no_process = self.state;
+
+        self.state = (x_no_process.wrapping_mul(MULTIPLIER)).wrapping_add(ADDER);
+
+        let x: u64 = (x_no_process ^ (x_no_process >> 64)) as u64;
+
+        rotr64(x, count)
+    }
+
+    // TODO: 最大値と最小値を指定した乱数、少数での乱数の関数を作成する
 }

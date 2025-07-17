@@ -14,6 +14,7 @@
         "hadamard",
         "Hadamard",
         "relu",
+        "rotr",
         "xorshift"
     ],
     "editor.comments.insertSpace": true,
