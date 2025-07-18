@@ -67,4 +67,37 @@ impl Rand {
     }
 
     // TODO: 最大値と最小値を指定した乱数、少数での乱数の関数を作成する
+
+    pub fn rand_f64(&mut self) -> f64 {
+        let exponent_bias: u64 = 1023;
+        let mut ret_u64 = self.next() & 0x1fffffffffffff;
+
+        if ret_u64 == 0 {
+            return 0.0;
+        }
+        if ret_u64 == 0x10000000000000 {
+            return 1.0;
+        }
+
+        let mut exponent: u64 = 0;
+
+        loop {
+            ret_u64 <<= 1;
+            if (exponent == 0) {
+                exponent = 1;
+            } else {
+                exponent <<= 1;
+            }
+
+            if ret_u64 & 0x10000000000000 == 0x10000000000000 {
+                break;
+            }
+        }
+
+        exponent += exponent_bias;
+
+        let ret_f64: f64 = f64::from_bits((exponent << 52) | (ret_u64 & 0xfffffffffffff));
+
+        ret_f64
+    }
 }
