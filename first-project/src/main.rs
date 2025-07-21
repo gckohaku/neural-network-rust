@@ -15,6 +15,6 @@ fn main() {
     let mut r = Rand::new();
 
     for _ in 0 .. 50 {
-        println!("{:X}", r.next())
+        println!("{:.15}", r.rand_f64());
     }
 }
