@@ -15,6 +15,8 @@ fn main() {
     let mut r = Rand::new();
 
     for _ in 0 .. 50 {
-        println!("{:.15}", r.rand_f64());
+        println!("{:.20}", r.rand_f64());
     }
+
+    // TODO: 正規分布に従った乱数の生成がしっかりと実装できているかをテスト
 }
