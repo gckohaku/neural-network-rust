@@ -100,11 +100,11 @@ impl Rand {
     /// 平均 `mu` 、分散 `sigma` の正規分布に従う乱数を生成する
     ///
     /// 通常の乱数は一様分布に従うような形になっているが、一様分布では不都合がある時に使う
-    fn normal(&mut self, mu: f64, sigma: f64) -> f64 {
+    pub fn normal(&mut self, mu: f64, sigma: f64) -> f64 {
         self.normal_use_cosine(mu, sigma)
     }
 
-    fn normal_use_cosine(&mut self, mu: f64, sigma: f64) -> f64 {
+    pub fn normal_use_cosine(&mut self, mu: f64, sigma: f64) -> f64 {
         let x = self.rand_f64();
         let y = self.rand_f64();
 
@@ -113,7 +113,7 @@ impl Rand {
         mu + z * sigma
     }
 
-    fn normal_use_sine(&mut self, mu: f64, sigma: f64) -> f64 {
+    pub fn normal_use_sine(&mut self, mu: f64, sigma: f64) -> f64 {
         let x = self.rand_f64();
         let y = self.rand_f64();
 

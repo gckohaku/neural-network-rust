@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cmp::Ordering, collections::HashMap};
 
 use crate::{matrix::Matrix, neural_network::NeuralNetwork, rand::Rand};
 
@@ -22,36 +22,65 @@ fn main() {
     // }
 
     // TODO: 正規分布に従った乱数の生成がしっかりと実装できているかをテスト
-    let division_values = 20;
-    let min_value = 0.0;
-    let max_value = 1.0;
+    let division_values = 64;
+    let min_value = -4.0;
+    let max_value = 4.0;
     let value_range = max_value - min_value;
     let values_length = 100000;
     let mut counts = HashMap::new();
+    let mut loss_count = 0;
 
-    for i in 0 .. division_values {
-        let key = format!("{:.2} <= v < {:.2}", min_value + (value_range / division_values as f64) * i as f64, min_value + (value_range / division_values as f64) * (i + 1) as f64);
-        println!("{}", key);
+    for i in 0..division_values {
+        let key = format!(
+            "{:.5} <= v < {:.5}",
+            min_value + (value_range / division_values as f64) * i as f64,
+            min_value + (value_range / division_values as f64) * (i + 1) as f64
+        );
+        // println!("{}", key);
 
         counts.insert(key, 0);
     }
 
-    for _i in 0 .. values_length {
-        let value = r.rand_f64();
-        println!("{:.20}", value);
-        println!("{:.20}", (value_range / division_values as f64));
+    for _i in 0..values_length {
+        let value = r.normal(0.0, 1.0);
+        // println!("{:.20}", value);
 
-        let category = (((value - min_value) * division_values as f64) / division_values as f64).ceil();
+        // ここの式が不適切
+        let category = ((value - min_value) * division_values as f64).floor();
+        println!("{}", category);
 
-        let key = format!("{:.2} <= v < {:.2}", min_value + (value_range / division_values as f64) * category, min_value + (value_range / division_values as f64) * (category + 1.0));
-        println!("{}", key);
+        let key = format!(
+            "{:.5} <= v < {:.5}",
+            min_value + (value_range / division_values as f64) * category,
+            min_value + (value_range / division_values as f64) * (category + 1.0)
+        );
+        // println!("{}", key);
 
-        let new_value = counts.get(&key).unwrap() + 1;
-
-        counts.insert(key, new_value);
+        if counts.contains_key(&key) {
+            let new_value = counts.get(&key).unwrap() + 1;
+            counts.insert(key, new_value);
+        }
+        else {
+            loss_count += 1;
+        }
     }
 
-    for data in counts {
-        println!("{:?}", data)
+    let mut keys = counts.keys().cloned().collect::<Vec<String>>();
+    keys.sort_by(|a, b| {
+        if a.chars().nth(0).unwrap() == '-' && b.chars().nth(0).unwrap() != '-' {
+            return Ordering::Less;
+        } else if a.chars().nth(0).unwrap() != '-' && b.chars().nth(0).unwrap() == '-' {
+            return Ordering::Greater;
+        } else if a.chars().nth(0).unwrap() == '-' && b.chars().nth(0).unwrap() == '-' {
+            return b.cmp(a);
+        }
+        a.cmp(b)
+    });
+
+    for key in keys {
+        let freq = counts.get(&key).unwrap();
+
+        println!("{}: {}", key, freq)
     }
+    println!("loss count: {}", loss_count)
 }
