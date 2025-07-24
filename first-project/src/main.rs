@@ -5,6 +5,7 @@ use crate::{matrix::Matrix, neural_network::NeuralNetwork, rand::Rand};
 mod matrix;
 mod neural_network;
 mod rand;
+mod test;
 
 fn main() {
     // let mut nn = NeuralNetwork::new(vec![3, 2, 1]);
@@ -23,8 +24,8 @@ fn main() {
 
     // TODO: 正規分布に従った乱数の生成がしっかりと実装できているかをテスト
     let division_values = 64;
-    let min_value = -4.0;
-    let max_value = 4.0;
+    let min_value = -0.25;
+    let max_value = 0.25;
     let value_range = max_value - min_value;
     let values_length = 100000;
     let mut counts = HashMap::new();
@@ -32,7 +33,7 @@ fn main() {
 
     for i in 0..division_values {
         let key = format!(
-            "{:.5} <= v < {:.5}",
+            "{:.10} <= v < {:.10}",
             min_value + (value_range / division_values as f64) * i as f64,
             min_value + (value_range / division_values as f64) * (i + 1) as f64
         );
@@ -42,15 +43,14 @@ fn main() {
     }
 
     for _i in 0..values_length {
-        let value = r.normal(0.0, 1.0);
+        let value = r.normal(0.0, (2.0f64/1024.0f64).sqrt());
         // println!("{:.20}", value);
 
-        // ここの式が不適切
-        let category = ((value - min_value) * division_values as f64).floor();
+        let category = ((value - min_value) / (value_range / division_values as f64)).floor() as f64;
         println!("{}", category);
 
         let key = format!(
-            "{:.5} <= v < {:.5}",
+            "{:.10} <= v < {:.10}",
             min_value + (value_range / division_values as f64) * category,
             min_value + (value_range / division_values as f64) * (category + 1.0)
         );
