@@ -1,6 +1,6 @@
 // ここに権利関係とかライセンスとか
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{f64::consts::{self}, time::{SystemTime, UNIX_EPOCH}};
 
 // PCD の XSL-RR での疑似乱数生成
 #[derive(Clone, Debug)]
@@ -68,15 +68,13 @@ impl Rand {
 
     // TODO: 最大値と最小値を指定した乱数、少数での乱数の関数を作成する
 
+    /// 0 以上 1 未満の乱数を返す
     pub fn rand_f64(&mut self) -> f64 {
         let exponent_bias: i64 = 1023;
         let mut ret_u64 = self.next() & 0x1fffffffffffff;
 
         if ret_u64 == 0 {
             return 0.0;
-        }
-        if ret_u64 == 0x10000000000000 {
-            return 1.0;
         }
 
         let mut exponent: i64 = 0;
@@ -92,8 +90,35 @@ impl Rand {
 
         exponent += exponent_bias;
 
-        let ret_f64: f64 = f64::from_bits((((exponent as u64) << 52) & 0x7ff0000000000000) | (ret_u64 & 0xfffffffffffff));
+        let ret_f64: f64 = f64::from_bits(
+            (((exponent as u64) << 52) & 0x7ff0000000000000) | (ret_u64 & 0xfffffffffffff),
+        );
 
         ret_f64
+    }
+
+    /// 平均 `mu` 、分散 `sigma` の正規分布に従う乱数を生成する
+    ///
+    /// 通常の乱数は一様分布に従うような形になっているが、一様分布では不都合がある時に使う
+    pub fn normal(&mut self, mu: f64, sigma: f64) -> f64 {
+        self.normal_use_cosine(mu, sigma)
+    }
+
+    pub fn normal_use_cosine(&mut self, mu: f64, sigma: f64) -> f64 {
+        let x = self.rand_f64();
+        let y = self.rand_f64();
+
+        let z = (-2.0 * x.ln()).sqrt() * (2.0 * consts::PI * y).cos();
+
+        mu + z * sigma
+    }
+
+    pub fn normal_use_sine(&mut self, mu: f64, sigma: f64) -> f64 {
+        let x = self.rand_f64();
+        let y = self.rand_f64();
+
+        let z = (-2.0 * x.ln()).sqrt() * (2.0 * consts::PI * y).sin();
+
+        mu + z * sigma
     }
 }
