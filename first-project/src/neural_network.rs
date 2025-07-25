@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::matrix::Matrix;
+use crate::{matrix::Matrix, rand::Rand};
 
 #[derive(Debug, Clone)]
 pub struct NeuralNetwork {
@@ -25,11 +25,27 @@ impl NeuralNetwork {
         let mut biases = Vec::new();
         let mut deltas = Vec::new();
 
+        let mut r = Rand::new();
+
         for i in 0..nodes_values.len() {
-            nodes.push(Matrix::new_and_fill(nodes_values[i], 1, 1.0).clone());
+            nodes.push(Matrix::new_and_fill(nodes_values[i], 1, 0.0));
             if i > 0 {
-                weights
-                    .push(Matrix::new_and_fill(nodes_values[i], nodes_values[i - 1], 1.0).clone());
+                // weights.push(Matrix::new_and_fill(
+                //     nodes_values[i],
+                //     nodes_values[i - 1],
+                //     1.0,
+                // ));
+                let mut layer_weights = Matrix::new(nodes_values[i], nodes_values[i - 1]);
+                for row in 0..layer_weights.rows {
+                    for col in 0..layer_weights.cols {
+                        layer_weights.set(
+                            row,
+                            col,
+                            r.normal(0.0, (2.0 / nodes_values[i - 1] as f64).sqrt()),
+                        ).unwrap();
+                    }
+                }
+                weights.push(layer_weights);
                 biases.push(Matrix::new_and_fill(nodes_values[i], 1, 0.0));
                 deltas.push(Matrix::new_and_fill(nodes_values[i], 1, 0.0));
             }
