@@ -7,15 +7,36 @@ pub struct NeuralNetwork {
     nodes: Vec<Matrix>,
     weights: Vec<Matrix>,
     biases: Vec<Matrix>,
+    activations: Vec<fn(&f64) -> f64>,
+    differential_activations: Vec<fn(&f64) -> f64>,
     deltas: Vec<Matrix>,
+    use_softmax_flags: Vec<bool>,
 }
 
-fn relu(x: &f64) -> f64 {
-    if *x > 0.0 { *x } else { 0.0 }
+pub fn relu(x: &f64) -> f64 {
+    x.max(0.0)
 }
 
-fn leaky_relu(x: &f64) -> f64 {
+pub fn differential_relu(x: &f64) -> f64 {
+    if *x > 0.0 { 1.0 } else { 0.0 }
+}
+
+pub fn leaky_relu(x: &f64) -> f64 {
     if *x > 0.0 { *x } else { 0.01 * *x }
+}
+
+pub fn differential_leaky_relu(x: &f64) -> f64 {
+    if *x > 0.0 { 1.0 } else { 0.01 }
+}
+
+pub fn softmax(z: &mut Matrix) {
+    let nodes_exp_sum: f64 = z.data.iter().map(|x| x.exp()).sum();
+    for i in 0 .. z.rows {
+        for j in 0 .. z.cols {
+            let before_normalize = z.get(i, j).unwrap();
+            z.set(i, j, before_normalize.exp() / nodes_exp_sum).unwrap();
+        }
+    }
 }
 
 impl NeuralNetwork {
@@ -23,26 +44,26 @@ impl NeuralNetwork {
         let mut nodes = Vec::new();
         let mut weights = Vec::new();
         let mut biases = Vec::new();
+        let activations: Vec<fn(&f64) -> f64> = Vec::new();
+        let differential_activations: Vec<fn(&f64) -> f64> = Vec::new();
         let mut deltas = Vec::new();
+        let use_softmax_flags = Vec::new();
 
         let mut r = Rand::new();
 
         for i in 0..nodes_values.len() {
             nodes.push(Matrix::new_and_fill(nodes_values[i], 1, 0.0));
             if i > 0 {
-                // weights.push(Matrix::new_and_fill(
-                //     nodes_values[i],
-                //     nodes_values[i - 1],
-                //     1.0,
-                // ));
                 let mut layer_weights = Matrix::new(nodes_values[i], nodes_values[i - 1]);
                 for row in 0..layer_weights.rows {
                     for col in 0..layer_weights.cols {
-                        layer_weights.set(
-                            row,
-                            col,
-                            r.normal(0.0, (2.0 / nodes_values[i - 1] as f64).sqrt()),
-                        ).unwrap();
+                        layer_weights
+                            .set(
+                                row,
+                                col,
+                                r.normal(0.0, (2.0 / nodes_values[i - 1] as f64).sqrt()),
+                            )
+                            .unwrap();
                     }
                 }
                 weights.push(layer_weights);
@@ -55,8 +76,26 @@ impl NeuralNetwork {
             nodes,
             weights,
             biases,
+            activations,
+            differential_activations,
             deltas,
+            use_softmax_flags,
         }
+    }
+
+    pub fn set_activations(&mut self, activations: &mut Vec<fn(&f64) -> f64>) {
+        self.activations.clear();
+        self.activations.append(activations);
+    }
+
+    pub fn set_differential_activation(&mut self, differentials: &mut Vec<fn(&f64) -> f64>) {
+        self.differential_activations.clear();
+        self.differential_activations.append(differentials);
+    }
+
+    pub fn set_use_softmax_flags(&mut self, flags: &mut Vec<bool>) {
+        self.use_softmax_flags.clear();
+        self.use_softmax_flags.append(flags);
     }
 
     pub fn view_status(&self) {
@@ -80,8 +119,12 @@ impl NeuralNetwork {
             let weighted_sum =
                 (&self.weights[i - 1] * &self.nodes[i - 1] + &self.biases[i - 1]).unwrap();
 
-            for j in 0..self.nodes[i].rows {
-                self.nodes[i].set(j, 0, relu(&weighted_sum[j][0]))?;
+            if self.use_softmax_flags[i - 1] {
+                softmax(&mut self.nodes[i]);
+            } else {
+                for j in 0..self.nodes[i].rows {
+                    self.nodes[i].set(j, 0, self.activations[i - 1](&weighted_sum[j][0]))?;
+                }
             }
         }
 
@@ -98,6 +141,7 @@ impl NeuralNetwork {
 
         // Backward pass logic would go here
         // This is a placeholder for now
+
         Ok(())
     }
 }
