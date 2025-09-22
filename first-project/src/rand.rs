@@ -1,6 +1,6 @@
 // ここに権利関係とかライセンスとか
 
-use std::{f64::consts::{self}, time::{SystemTime, UNIX_EPOCH}};
+use std::{f64::consts::{self}, num, ops::{Add, Div, Sub}, time::{SystemTime, UNIX_EPOCH}};
 
 // PCD の XSL-RR での疑似乱数生成
 #[derive(Clone, Debug)]
@@ -66,12 +66,26 @@ impl Rand {
         rotr64(x, count)
     }
 
+    pub fn rand_int<T>(mut self, min: T, max: T) -> T
+    where 
+        T: Add<Output = T> + Sub<Output = T> + Div<Output = T> + From<u64> + num,
+    {
+        let range = max - min;
+
+        let mut value = T::from(self.next());
+        loop {
+            if value / range >= T::max() / range {
+                
+            }
+        }
+    }
+
     pub fn rand_u32(mut self, min: u32, max: u32) -> u32 {
         let range = max - min;
 
         let mut value = self.next() as u32;
         loop {
-            if (value / range >= 0xffffffff / range) {
+            if value / range >= 0xffffffff / range {
                 value = self.next() as u32;
                 continue;
             }

@@ -24,7 +24,7 @@ fn generate_shuffle_array(value: usize) -> Vec<usize> {
     let r = rand::Rand::new();
 
     for i in (1..value).rev() {
-        let j = 
+        
     }
 
     v
