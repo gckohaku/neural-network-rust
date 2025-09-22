@@ -5,3 +5,12 @@ version = 4
 [[package]]
 name = "first-project"
 version = "0.1.0"
+dependencies = [
+ "irisdata",
+]
+
+[[package]]
+name = "irisdata"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "529768dbece6195a91550c02ea4d1e2b6763a3327e7c79acba3a742454478023"

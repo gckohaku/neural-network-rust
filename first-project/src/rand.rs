@@ -66,6 +66,22 @@ impl Rand {
         rotr64(x, count)
     }
 
+    pub fn rand_u32(mut self, min: u32, max: u32) -> u32 {
+        let range = max - min;
+
+        let mut value = self.next() as u32;
+        loop {
+            if (value / range >= 0xffffffff / range) {
+                value = self.next() as u32;
+                continue;
+            }
+
+            break;
+        }
+
+        value + min
+    }
+
     // TODO: 最大値と最小値を指定した乱数、少数での乱数の関数を作成する
 
     /// 0 以上 1 未満の乱数を返す

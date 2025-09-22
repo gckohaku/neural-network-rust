@@ -1,6 +1,11 @@
 mod add;
+mod sub;
+mod mul;
+mod div;
 
-use std::{fmt::{Debug, Display}, ops, vec};
+use std::{
+    fmt::{Debug, Display}, ops, result, vec
+};
 
 #[derive(Clone, Debug)]
 pub struct Matrix {
@@ -69,6 +74,15 @@ impl Matrix {
         }
     }
 
+    pub fn add_cell(&mut self, row: usize, col: usize, value: f64) -> Result<(), String> {
+       if row < self.rows && col < self.cols {
+            self.data[row * self.cols + col] += value;
+            Ok(())
+        } else {
+            Err("Index out of bounds".to_string())
+        }
+    }
+
     pub fn fill(&mut self, value: f64) {
         for i in 0..self.rows {
             for j in 0..self.cols {
@@ -88,13 +102,13 @@ impl Matrix {
     }
 
     pub fn hadamard_assign(&mut self, other: &Matrix) -> Result<(), String> {
-        if self.rows != other.rows || self.cols != other.cols {
-            return Err("Matrices must have the same size for Hadamard product".to_string());
+        if self.rows % other.rows != 0 || self.cols % other.cols != 0 {
+            return Err("Matrices must have the same size or able to broadcast for Hadamard product".to_string());
         }
         for i in 0..self.rows {
             for j in 0..self.cols {
                 let a = self.get(i, j).unwrap();
-                let b = other.get(i, j).unwrap();
+                let b = other.get(i % other.rows, j % other.cols).unwrap();
                 self.set(i, j, a * b)?;
             }
         }
@@ -102,12 +116,35 @@ impl Matrix {
     }
 
     pub fn hadamard(&self, other: &Matrix) -> Result<Matrix, String> {
-        if self.rows != other.rows || self.cols != other.cols {
-            return Err("Matrices must have the same size for Hadamard product".to_string());
+        if self.rows % other.rows != 0 || self.cols % other.cols != 0 {
+            return Err("Matrices must have the same size or able to broadcast for Hadamard product".to_string());
         }
-		let mut result = self.clone();
-		result.hadamard_assign(other)?;
-		Ok(result)
+        let mut result = self.clone();
+        result.hadamard_assign(other)?;
+        Ok(result)
+    }
+
+    pub fn hadamard_function_assign(&mut self, function: fn(&f64) -> f64) {
+        for row in 0..self.rows {
+            for col in 0..self.cols {
+                let element = self.get(row, col).unwrap();
+                self.set(row, col, function(&element)).unwrap();
+            }
+        }
+    }
+
+    pub fn hadamard_function(&mut self, function: fn(&f64) -> f64) -> Matrix {
+        let mut ret = self.clone();
+        ret.hadamard_function_assign(function);
+        ret
+    }
+
+    pub fn sum_all_elements(&mut self) -> f64 {
+        self.data.iter().sum::<f64>()
+    }
+
+    pub fn sum_row_elements(&mut self, row: usize) -> f64 {
+        self.get_row(row).unwrap().iter().sum::<f64>()
     }
 }
 
@@ -118,7 +155,13 @@ impl Display for Matrix {
 
         for i in 0..self.rows {
             for j in 0..self.cols {
-                write!(f, "{:width$.precision$}", self.get(i, j).unwrap(), width = width, precision = precision)?;
+                write!(
+                    f,
+                    "{:width$.precision$}",
+                    self.get(i, j).unwrap(),
+                    width = width,
+                    precision = precision
+                )?;
             }
             writeln!(f)?;
         }
@@ -168,204 +211,6 @@ impl ops::IndexMut<usize> for Matrix {
             &mut self.data[index * self.cols..(index + 1) * self.cols]
         } else {
             panic!("Row index out of bounds");
-        }
-    }
-}
-
-// Matrix *= f64
-impl ops::MulAssign<f64> for Matrix {
-    fn mul_assign(&mut self, scalar: f64) {
-        for i in 0..self.rows {
-            for j in 0..self.cols {
-                let product = self.get(i, j).unwrap() * scalar;
-                self.set(i, j, product).unwrap();
-            }
-        }
-    }
-}
-
-// Matrix *= &f64
-impl ops::MulAssign<&f64> for Matrix {
-    fn mul_assign(&mut self, scalar: &f64) {
-        for i in 0..self.rows {
-            for j in 0..self.cols {
-                let product = self.get(i, j).unwrap() * scalar;
-                self.set(i, j, product).unwrap();
-            }
-        }
-    }
-}
-
-// Matrix * f64
-impl ops::Mul<f64> for Matrix {
-    type Output = Matrix;
-
-    fn mul(self, scalar: f64) -> Self::Output {
-        let mut result = self.clone();
-        result *= scalar;
-        result
-    }
-}
-
-// &Matrix * f64
-impl ops::Mul<f64> for &Matrix {
-    type Output = Matrix;
-
-    fn mul(self, scalar: f64) -> Self::Output {
-        let mut result = self.clone();
-        result *= scalar;
-        result
-    }
-}
-
-// f64 * Matrix
-impl ops::Mul<Matrix> for f64 {
-    type Output = Matrix;
-
-    fn mul(self, matrix: Matrix) -> Self::Output {
-        let mut result = matrix.clone();
-        result *= self;
-        result
-    }
-}
-
-// f64 * &Matrix
-impl ops::Mul<&Matrix> for f64 {
-    type Output = Matrix;
-
-    fn mul(self, matrix: &Matrix) -> Self::Output {
-        let mut result = matrix.clone();
-        result *= self;
-        result
-    }
-}
-
-// Matrix -= Matrix
-impl ops::SubAssign<Matrix> for Matrix {
-    fn sub_assign(&mut self, rhs: Matrix) {
-        if self.rows == rhs.rows && self.cols == rhs.cols {
-            // for i in 0..self.rows {
-            // 	for j in 0..self.cols {
-            // 		let diff = self.get(i, j).unwrap() - rhs.get(i, j).unwrap();
-            // 		self.set(i, j, diff).unwrap();
-            // 	}
-            // }
-            *self += rhs * -1.0;
-        } else {
-            panic!("Matrices must have the same size for subtraction");
-        }
-    }
-}
-
-// Matrix -= &Matrix
-impl ops::SubAssign<&Matrix> for Matrix {
-    fn sub_assign(&mut self, rhs: &Matrix) {
-        if self.rows == rhs.rows && self.cols == rhs.cols {
-            *self += rhs * -1.0;
-        } else {
-            panic!("Matrices must have the same size for subtraction");
-        }
-    }
-}
-
-// Matrix - Matrix
-impl ops::Sub<Matrix> for Matrix {
-    type Output = Result<Matrix, String>;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        if self.rows == rhs.rows && self.cols == rhs.cols {
-            let mut result = self.clone();
-            result -= rhs;
-            Ok(result)
-        } else {
-            panic!("Matrices must have the same size for subtraction")
-        }
-    }
-}
-
-// &Matrix - &Matrix
-impl ops::Sub<&Matrix> for &Matrix {
-    type Output = Result<Matrix, String>;
-
-    fn sub(self, rhs: &Matrix) -> Self::Output {
-        if self.rows == rhs.rows && self.cols == rhs.cols {
-            let mut result = self.clone();
-            result -= rhs;
-            Ok(result)
-        } else {
-            Err("Matrices must have the same size for subtraction".to_string())
-        }
-    }
-}
-
-// Matrix *= Matrix
-impl ops::MulAssign<Matrix> for Matrix {
-    fn mul_assign(&mut self, rhs: Matrix) {
-        if self.cols == rhs.rows {
-            let mut result = Matrix::new(self.rows, rhs.cols);
-            for i in 0..self.rows {
-                for j in 0..rhs.cols {
-                    let mut sum = 0.0;
-                    for k in 0..self.cols {
-                        sum += self.get(i, k).unwrap() * rhs.get(k, j).unwrap();
-                    }
-                    result.set(i, j, sum).unwrap();
-                }
-            }
-            *self = result;
-        } else {
-            panic!("Matrices must have compatible dimensions for multiplication");
-        }
-    }
-}
-
-// Matrix *= &Matrix
-impl ops::MulAssign<&Matrix> for Matrix {
-    fn mul_assign(&mut self, rhs: &Matrix) {
-        if self.cols == rhs.rows {
-            let mut result = Matrix::new(self.rows, rhs.cols);
-            for i in 0..self.rows {
-                for j in 0..rhs.cols {
-                    let mut sum = 0.0;
-                    for k in 0..self.cols {
-                        sum += self.get(i, k).unwrap() * rhs.get(k, j).unwrap();
-                    }
-                    result.set(i, j, sum).unwrap();
-                }
-            }
-            *self = result;
-        } else {
-            panic!("Matrices must have compatible dimensions for multiplication");
-        }
-    }
-}
-
-// Matrix * Matrix
-impl ops::Mul<Matrix> for Matrix {
-    type Output = Result<Matrix, String>;
-
-    fn mul(self, rhs: Matrix) -> Self::Output {
-        if self.cols == rhs.rows {
-            let mut result = self.clone();
-            result *= rhs;
-            Ok(result)
-        } else {
-            Err("Matrices must have compatible dimensions for multiplication".to_string())
-        }
-    }
-}
-
-// &Matrix * &Matrix
-impl ops::Mul<&Matrix> for &Matrix {
-    type Output = Result<Matrix, String>;
-
-    fn mul(self, rhs: &Matrix) -> Self::Output {
-        if self.cols == rhs.rows {
-            let mut result = self.clone();
-            result *= rhs;
-            Ok(result)
-        } else {
-            Err("Matrices must have compatible dimensions for multiplication".to_string())
         }
     }
 }

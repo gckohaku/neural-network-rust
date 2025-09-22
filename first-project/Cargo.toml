@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+irisdata = "0.1.2"
 
 [profile.dev]
 opt-level = 1
