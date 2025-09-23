@@ -23,8 +23,8 @@ fn generate_shuffle_array(value: usize) -> Vec<usize> {
     let v = (0..value).collect::<Vec<usize>>();
     let r = rand::Rand::new();
 
-    for i in (1..value).rev() {
-        
+    for i in 1..=(value - 2) {
+        let j = r.rand_usize_range(i, value);
     }
 
     v

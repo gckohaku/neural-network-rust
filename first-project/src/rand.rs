@@ -1,11 +1,15 @@
 // ここに権利関係とかライセンスとか
 
 use std::{
-    f64::consts::{self}, num::{self, NonZero}, ops::{Add, Div, Rem, Sub}, process::Output, time::{SystemTime, UNIX_EPOCH}
+    f64::consts::{self},
+    num::{self, NonZero},
+    ops::{Add, Div, Rem, Sub},
+    process::Output,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 // PCD の XSL-RR での疑似乱数生成
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 pub struct Rand {
     state: u128,
 }
@@ -68,6 +72,7 @@ impl Rand {
         rotr64(x, count)
     }
 
+    /// min 以上 max 未満のランダムな u32 を返す
     pub fn rand_u32_range(mut self, min: u32, max: u32) -> u32 {
         let range = max - min;
 
@@ -84,6 +89,7 @@ impl Rand {
         (value % range) + min
     }
 
+    /// min 以上 max 未満のランダムな usize を返す
     pub fn rand_usize_range(mut self, min: usize, max: usize) -> usize {
         let range = max - min;
 
