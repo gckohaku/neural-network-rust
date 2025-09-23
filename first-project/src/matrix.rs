@@ -214,3 +214,5 @@ impl ops::IndexMut<usize> for Matrix {
         }
     }
 }
+
+// https://doc.rust-lang.org/std/ops/trait.Index.html#impl-Index%3CI%3E-for-%5BT;+N%5D
