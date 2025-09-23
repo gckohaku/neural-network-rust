@@ -228,6 +228,8 @@ impl NeuralNetwork {
             self.biases[i] = (self.biases[i].clone() - (eta * self.deltas[i].clone())).unwrap();
         }
 
+        // サンプルサイズを変更できるようにする (重み)
+
         Ok(())
     }
 }
