@@ -131,10 +131,10 @@ impl NeuralNetwork {
         }
         let output_index = self.nodes.len() - 1;
         if expects.rows != self.nodes[output_index].rows
-            || inputs.cols != self.nodes[output_index].cols
+            || expects.cols != self.nodes[output_index].cols
         {
             return Err(
-                "Expect dimensions do not match the output layer of the network.".to_string(),
+                format!("Expect dimensions do not match the output layer of the network. expects: ({row}, {col}), output: ({o_row}, {o_col})", row = expects.rows, col = expects.cols, o_row = self.nodes[output_index].rows, o_col = self.nodes[output_index].cols).to_string(),
             );
         }
 
@@ -235,6 +235,14 @@ impl NeuralNetwork {
         self.nodes.iter_mut().for_each(|m| m.change_row_size(sample_size));
         self.nodes_after_activation.iter_mut().for_each(|m| m.change_row_size(sample_size));
         self.deltas.iter_mut().for_each(|m| m.change_row_size(sample_size));
+    }
+
+    pub fn get_input_node_value(&self) -> usize {
+        self.nodes[0].cols
+    }
+
+    pub fn get_output_node_value(&self) -> usize {
+        self.nodes.last().unwrap().cols
     }
 }
 

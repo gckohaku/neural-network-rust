@@ -26,15 +26,42 @@ fn main() {
     nn.set_output_activation_type(OutputActivationType::SoftmaxAndCrossEntropy);
 
     for batch in irisdata::IRIS_DATA.chunks(mini_batch_sample_size) {
-        let batch_data = Vec::new();
+        let mut batch_data: Vec<f64> = Vec::new();
+        let mut expect_data: Vec<f64> = Vec::new();
+
         for data in batch {
-            batch_data.push(data.sepal_length);
-            batch_data.push(data.sepal_width);
-            batch_data.push(data.petal_length);
-            batch_data.push(data.petal_width);
+            batch_data.push(data.sepal_length as f64);
+            batch_data.push(data.sepal_width as f64);
+            batch_data.push(data.petal_length as f64);
+            batch_data.push(data.petal_width as f64);
+
+            expect_data.push(if data.species == irisdata::Species::IrisSetosa {
+                1.0
+            } else {
+                0.0
+            });
+            expect_data.push(if data.species == irisdata::Species::IrisVersicolor {
+                1.0
+            } else {
+                0.0
+            });
+            expect_data.push(if data.species == irisdata::Species::IrisVirginica {
+                1.0
+            } else {
+                0.0
+            });
         }
 
-        nn.forward(inputs, expects);
+        let input_node_value = nn.get_input_node_value();
+        let output_node_value = nn.get_output_node_value();
+
+        let inputs =
+            Matrix::new_from_vec(mini_batch_sample_size, input_node_value, batch_data).unwrap();
+        let expects =
+            Matrix::new_from_vec(mini_batch_sample_size, output_node_value, expect_data).unwrap();
+
+        nn.forward(&inputs, &expects).unwrap();
+        nn.backward(&expects, 0.01).unwrap();
     }
 }
 
