@@ -228,9 +228,13 @@ impl NeuralNetwork {
             self.biases[i] = (self.biases[i].clone() - (eta * self.deltas[i].clone())).unwrap();
         }
 
-        // サンプルサイズを変更できるようにする (重み)
-
         Ok(())
+    }
+
+    pub fn change_sample_size(&mut self, sample_size: usize) {
+        self.nodes.iter_mut().for_each(|m| m.change_row_size(sample_size));
+        self.nodes_after_activation.iter_mut().for_each(|m| m.change_row_size(sample_size));
+        self.deltas.iter_mut().for_each(|m| m.change_row_size(sample_size));
     }
 }
 

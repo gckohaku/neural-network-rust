@@ -1,10 +1,11 @@
 mod add;
-mod sub;
-mod mul;
 mod div;
+mod mul;
+mod sub;
 
 use std::{
-    fmt::{Debug, Display}, ops, result, vec
+    fmt::{Debug, Display},
+    ops, result, vec,
 };
 
 #[derive(Clone, Debug)]
@@ -75,7 +76,7 @@ impl Matrix {
     }
 
     pub fn add_cell(&mut self, row: usize, col: usize, value: f64) -> Result<(), String> {
-       if row < self.rows && col < self.cols {
+        if row < self.rows && col < self.cols {
             self.data[row * self.cols + col] += value;
             Ok(())
         } else {
@@ -103,7 +104,10 @@ impl Matrix {
 
     pub fn hadamard_assign(&mut self, other: &Matrix) -> Result<(), String> {
         if self.rows % other.rows != 0 || self.cols % other.cols != 0 {
-            return Err("Matrices must have the same size or able to broadcast for Hadamard product".to_string());
+            return Err(
+                "Matrices must have the same size or able to broadcast for Hadamard product"
+                    .to_string(),
+            );
         }
         for i in 0..self.rows {
             for j in 0..self.cols {
@@ -117,7 +121,10 @@ impl Matrix {
 
     pub fn hadamard(&self, other: &Matrix) -> Result<Matrix, String> {
         if self.rows % other.rows != 0 || self.cols % other.cols != 0 {
-            return Err("Matrices must have the same size or able to broadcast for Hadamard product".to_string());
+            return Err(
+                "Matrices must have the same size or able to broadcast for Hadamard product"
+                    .to_string(),
+            );
         }
         let mut result = self.clone();
         result.hadamard_assign(other)?;
@@ -145,6 +152,11 @@ impl Matrix {
 
     pub fn sum_row_elements(&mut self, row: usize) -> f64 {
         self.get_row(row).unwrap().iter().sum::<f64>()
+    }
+
+    pub fn change_row_size(&mut self, row_size: usize) {
+        self.rows = row_size;
+        self.data.resize(row_size * self.cols, 0.0);
     }
 }
 
@@ -214,5 +226,3 @@ impl ops::IndexMut<usize> for Matrix {
         }
     }
 }
-
-// https://doc.rust-lang.org/std/ops/trait.Index.html#impl-Index%3CI%3E-for-%5BT;+N%5D

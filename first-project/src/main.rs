@@ -24,6 +24,18 @@ fn main() {
         differential_relu,
     ]);
     nn.set_output_activation_type(OutputActivationType::SoftmaxAndCrossEntropy);
+
+    for batch in irisdata::IRIS_DATA.chunks(mini_batch_sample_size) {
+        let batch_data = Vec::new();
+        for data in batch {
+            batch_data.push(data.sepal_length);
+            batch_data.push(data.sepal_width);
+            batch_data.push(data.petal_length);
+            batch_data.push(data.petal_width);
+        }
+
+        nn.forward(inputs, expects);
+    }
 }
 
 fn generate_shuffle_array(value: usize) -> Vec<usize> {
