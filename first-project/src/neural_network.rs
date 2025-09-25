@@ -158,7 +158,8 @@ impl NeuralNetwork {
             println!("{:?}", self.output_activation_type);
 
             // 出力層かつ目的関数を別途指定している場合、設定に応じて処理が分かれる
-            if i >= self.weights.len() && self.output_activation_type != OutputActivationType::Default
+            if i >= self.weights.len()
+                && self.output_activation_type != OutputActivationType::Default
             {
                 // softmax 関数と交差エントロピー誤差を利用する場合
                 if self.output_activation_type == OutputActivationType::SoftmaxAndCrossEntropy {
@@ -180,18 +181,15 @@ impl NeuralNetwork {
                     // 総和行列を作成する　ブロードキャストできるようにしているので、各サンプルの要素は一つでいい
                     let mut node_sums: Vec<f64> = Vec::new();
                     for s in 0..sample_size {
-                        node_sums.push(self.nodes[i].sum_row_elements(s));
+                        node_sums.push(exp_output.sum_row_elements(s));
                     }
                     let mut sum_matrix = Matrix::new_from_vec(sample_size, 1, node_sums).unwrap();
-                    println!("a");
-                    println!("{:7.2}", sum_matrix);
-                    println!("o");
 
                     let softmax_result = exp_output
                         .hadamard(&sum_matrix.hadamard_function(|x| 1.0 / (x + 1e-10)))
                         .unwrap();
 
-                    self.nodes_after_activation.push(softmax_result);
+                    self.nodes_after_activation[i] = softmax_result;
                 }
             } else {
                 self.nodes_after_activation[i] =
@@ -202,7 +200,7 @@ impl NeuralNetwork {
         // 誤差を求める　求めた後にサンプル数で除算
         let mut mini_batch_error = 0.0;
 
-        let mut output_node = self.nodes[output_index].clone();
+        let mut output_node = self.nodes_after_activation[output_index].clone();
 
         // softmax 関数と交差エントロピー誤差を利用する場合
         if self.output_activation_type == OutputActivationType::SoftmaxAndCrossEntropy {
@@ -227,7 +225,7 @@ impl NeuralNetwork {
         self.deltas[other_output_index] = (&self.nodes[node_output_index] - expects).unwrap();
 
         // 隠れ層のデルタ
-        for i in (0..other_output_index - 1).rev() {
+        for i in (0..other_output_index).rev() {
             let delta = &self.deltas[i + 1];
             let w = self.weights[i + 1].transpose();
             let u = &mut self.nodes[i + 1];
@@ -235,12 +233,15 @@ impl NeuralNetwork {
             let da_u = u.hadamard_function(da);
 
             self.deltas[i] = (delta * &w).unwrap().hadamard(&da_u).unwrap();
+            println!("index: {}", i);
         }
 
         // 求めたデルタを用いて勾配を計算する
         for i in (0..other_output_index).rev() {
-            self.weights[i] -= eta * (&self.nodes_after_activation[i].transpose() * &self.deltas[i]).unwrap();
+            self.weights[i] -=
+                eta * (&self.nodes_after_activation[i].transpose() * &self.deltas[i]).unwrap();
             self.biases[i] -= eta * &self.deltas[i].mean_cols();
+            println!("{:7.2}", &self.deltas[i].mean_cols());
         }
 
         Ok(())

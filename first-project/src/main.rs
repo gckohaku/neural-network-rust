@@ -62,11 +62,11 @@ fn main() {
             Matrix::new_from_vec(mini_batch_sample_size, output_node_value, expect_data).unwrap();
 
         nn.forward(&inputs, &expects).unwrap();
-        nn.backward(&expects, 0.01).unwrap();
+        nn.backward(&expects, 0.1).unwrap();
 
         break;
     }
-    // nn.export_ron();
+    nn.export_ron();
 }
 
 fn generate_shuffle_array(value: usize) -> Vec<usize> {
