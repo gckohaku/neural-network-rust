@@ -64,7 +64,7 @@ fn main() {
         nn.forward(&inputs, &expects).unwrap();
         nn.backward(&expects, 0.1).unwrap();
 
-        break;
+        // break;
     }
     nn.export_ron();
 }

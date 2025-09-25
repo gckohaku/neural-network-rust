@@ -224,6 +224,8 @@ impl NeuralNetwork {
         // 出力層のデルタ
         self.deltas[other_output_index] = (&self.nodes[node_output_index] - expects).unwrap();
 
+        println!("other output index: {}", other_output_index);
+
         // 隠れ層のデルタ
         for i in (0..other_output_index).rev() {
             let delta = &self.deltas[i + 1];
@@ -270,6 +272,8 @@ impl NeuralNetwork {
     pub fn export_ron(&self) {
         let mut node_values = Vec::<usize>::new();
         let mut layer_infos = Vec::<LayerInfo>::new();
+
+        node_values.push(self.nodes[0].cols);
 
         for i in 0..self.weights.len() {
             let info = LayerInfo {

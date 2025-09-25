@@ -161,15 +161,12 @@ impl Matrix {
 
     pub fn mean_cols(&mut self) -> Matrix {
         let mut result = Matrix::new(1, self.cols);
-        println!("matrix: {:7.2}", self);
 
-        for col in 0..self.rows {
+        for col in 0..self.cols {
             let mut col_sum = 0.0;
-            for row in 0..self.cols {
-                println!("{}, {}", row, col);
+            for row in 0..self.rows {
                 col_sum += self[(row, col)];
             }
-            println!("sum: {}", col_sum);
             result.set(0, col, col_sum / self.rows as f64).unwrap();
         }
 
