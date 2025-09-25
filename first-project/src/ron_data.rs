@@ -2,13 +2,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RonNNData {
-	layer_value: usize,
-	node_values: Vec<usize>,
-	layers: Vec<LayerInfo>
+	pub layer_value: usize,
+	pub node_values: Vec<usize>,
+	pub layers: Vec<LayerInfo>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LayerInfo {
-	weights: Vec<f64>,
-	biases: Vec<f64>
+	pub weights: Vec<f64>,
+	pub biases: Vec<f64>
 }

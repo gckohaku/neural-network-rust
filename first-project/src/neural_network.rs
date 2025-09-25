@@ -1,6 +1,11 @@
 use std::{fmt::Display, ops::Add, process::Output};
 
-use crate::{matrix::Matrix, output_activation_type::OutputActivationType, rand::Rand};
+use crate::{
+    matrix::Matrix,
+    output_activation_type::OutputActivationType,
+    rand::Rand,
+    ron_data::{LayerInfo, RonNNData},
+};
 
 #[derive(Debug, Clone)]
 pub struct NeuralNetwork {
@@ -224,17 +229,26 @@ impl NeuralNetwork {
 
         // 求めたデルタを用いて勾配を計算する
         for i in (0..other_output_index).rev() {
-            self.weights[i] = (self.weights[i].clone() - eta * (self.nodes_after_activation[i].transpose()) * self.deltas[i].clone()).unwrap();
-            self.biases[i] = (self.biases[i].clone() - (eta * self.deltas[i].clone())).unwrap();
+            self.weights[i] -= &(eta * self.nodes_after_activation[i].transpose()) * &self.deltas[i];
+
+
+        
+            self.biases[i] -= eta * &self.deltas[i].mean_cols();
         }
 
         Ok(())
     }
 
     pub fn change_sample_size(&mut self, sample_size: usize) {
-        self.nodes.iter_mut().for_each(|m| m.change_row_size(sample_size));
-        self.nodes_after_activation.iter_mut().for_each(|m| m.change_row_size(sample_size));
-        self.deltas.iter_mut().for_each(|m| m.change_row_size(sample_size));
+        self.nodes
+            .iter_mut()
+            .for_each(|m| m.change_row_size(sample_size));
+        self.nodes_after_activation
+            .iter_mut()
+            .for_each(|m| m.change_row_size(sample_size));
+        self.deltas
+            .iter_mut()
+            .for_each(|m| m.change_row_size(sample_size));
     }
 
     pub fn get_input_node_value(&self) -> usize {
@@ -245,8 +259,27 @@ impl NeuralNetwork {
         self.nodes.last().unwrap().cols
     }
 
-    pub fn export_ron() {
-        
+    pub fn export_ron(&self) {
+        let mut node_values = Vec::<usize>::new();
+        let mut layer_infos = Vec::<LayerInfo>::new();
+
+        for i in 0..self.weights.len() {
+            let info = LayerInfo {
+                weights: self.weights[i].data.clone(),
+                biases: self.biases[i].data.clone(),
+            };
+
+            layer_infos.push(info);
+            node_values.push(self.weights[i].cols);
+        }
+
+        let nn_ron_data = RonNNData {
+            layer_value: self.weights.len(),
+            node_values,
+            layers: layer_infos,
+        };
+
+        println!("{}", ron::to_string(&nn_ron_data).unwrap())
     }
 }
 

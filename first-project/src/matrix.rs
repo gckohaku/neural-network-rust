@@ -158,6 +158,20 @@ impl Matrix {
         self.rows = row_size;
         self.data.resize(row_size * self.cols, 0.0);
     }
+
+    pub fn mean_cols(&mut self) -> Matrix {
+        let mut result = Matrix::new(1, self.cols);
+
+        for col in 0..self.cols {
+            let mut col_sum = 0.0;
+            for row in 0..self.rows {
+                col_sum += self[(row, col)];
+            }
+            result.set(0, col, col_sum / self.rows as f64).unwrap();
+        }
+
+        result
+    }
 }
 
 impl Display for Matrix {
