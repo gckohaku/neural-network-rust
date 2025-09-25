@@ -79,8 +79,8 @@ impl NeuralNetwork {
                     }
                 }
                 weights.push(layer_weights);
-                // バイアス行列のサイズは現在の層のノードのサイズと同じ
-                biases.push(Matrix::new_and_fill(sample_value, nodes_values[i], 0.0));
+                // バイアス行列のサイズは 1 x 現在の層のノードの数
+                biases.push(Matrix::new_and_fill(1, nodes_values[i], 0.0));
                 // デルタ行列のサイズも現在の層のノードのサイズと同じ
                 deltas.push(Matrix::new_and_fill(sample_value, nodes_values[i], 0.0));
             }
@@ -243,6 +243,10 @@ impl NeuralNetwork {
 
     pub fn get_output_node_value(&self) -> usize {
         self.nodes.last().unwrap().cols
+    }
+
+    pub fn export_ron() {
+        
     }
 }
 

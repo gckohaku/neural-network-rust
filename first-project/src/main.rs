@@ -10,6 +10,7 @@ mod matrix;
 mod neural_network;
 mod output_activation_type;
 mod rand;
+mod ron_data;
 
 fn main() {
     // ミニバッチ内のサンプルサイズを指定
@@ -62,6 +63,8 @@ fn main() {
 
         nn.forward(&inputs, &expects).unwrap();
         nn.backward(&expects, 0.01).unwrap();
+
+        
     }
 }
 
