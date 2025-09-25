@@ -176,7 +176,7 @@ impl Matrix {
 
 impl Display for Matrix {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let width = f.width().unwrap();
+        let width = f.width().unwrap_or(0);
         let precision = f.precision().unwrap_or(0);
 
         for i in 0..self.rows {

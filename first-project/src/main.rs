@@ -63,8 +63,10 @@ fn main() {
 
         nn.forward(&inputs, &expects).unwrap();
         nn.backward(&expects, 0.01).unwrap();
+
+        break;
     }
-    nn.export_ron();
+    // nn.export_ron();
 }
 
 fn generate_shuffle_array(value: usize) -> Vec<usize> {
