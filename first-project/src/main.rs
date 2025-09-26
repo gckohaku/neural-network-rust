@@ -17,9 +17,11 @@ fn main() {
     let mini_batch_sample_size = 10;
 
     // iris dataset 用ニューラルネットワーク
-    let mut nn = NeuralNetwork::new(vec![4, 8, 4, 3], mini_batch_sample_size);
-    nn.set_activations(&mut vec![relu, relu, relu]);
+    let mut nn = NeuralNetwork::new(vec![4, 6, 8, 6, 4, 3], mini_batch_sample_size);
+    nn.set_activations(&mut vec![relu, relu, relu, relu, relu]);
     nn.set_differential_activation(&mut vec![
+        differential_relu,
+        differential_relu,
         differential_relu,
         differential_relu,
         differential_relu,
@@ -27,10 +29,10 @@ fn main() {
     nn.set_output_activation_type(OutputActivationType::SoftmaxAndCrossEntropy);
 
     let epoch_value = 100000;
-    let r = Rand::new();
+    let mut r = Rand::new();
 
     for epoch in 0..epoch_value {
-        let shuffle_index = generate_shuffle_array(irisdata::IRIS_DATA.len(), r);
+        let shuffle_index = generate_shuffle_array(irisdata::IRIS_DATA.len(), &mut r);
         let mut epoch_error = 0.0;
 
         for indexes in shuffle_index.chunks(mini_batch_sample_size) {
@@ -79,16 +81,16 @@ fn main() {
 
             nn.forward(&inputs, &expects).unwrap();
             epoch_error += nn.get_error();
-            nn.backward(&expects, 0.1).unwrap();
+            nn.backward(&expects, 0.000005).unwrap();
         }
 
-        println!("epoch {:6} error: {:13.10}", epoch, epoch_error);
+        println!("epoch {:6} error: {:13.10}", epoch + 1, epoch_error);
     }
 
     nn.export_ron();
 }
 
-fn generate_shuffle_array(value: usize, r: Rand) -> Vec<usize> {
+fn generate_shuffle_array(value: usize, r: &mut Rand) -> Vec<usize> {
     let mut v = (0..value).collect::<Vec<usize>>();
 
     for i in 0..=(value - 2) {

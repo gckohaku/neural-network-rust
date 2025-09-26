@@ -9,7 +9,7 @@ use std::{
 };
 
 // PCD の XSL-RR での疑似乱数生成
-#[derive(Clone, Debug, Copy)]
+#[derive(Clone, Debug)]
 pub struct Rand {
     state: u128,
 }
@@ -62,6 +62,7 @@ impl Rand {
     }
 
     pub fn next(&mut self) -> u64 {
+        let before_state = self.state;
         let count: u8 = (self.state >> 122) as u8;
         let x_no_process = self.state;
 
@@ -73,7 +74,7 @@ impl Rand {
     }
 
     /// min 以上 max 未満のランダムな u32 を返す
-    pub fn rand_u32_range(mut self, min: u32, max: u32) -> u32 {
+    pub fn rand_u32_range(&mut self, min: u32, max: u32) -> u32 {
         let range = max - min;
 
         let mut value = self.next() as u32;
@@ -90,11 +91,11 @@ impl Rand {
     }
 
     /// min 以上 max 未満のランダムな usize を返す
-    pub fn rand_usize_range(mut self, min: usize, max: usize) -> usize {
+    pub fn rand_usize_range(&mut self, min: usize, max: usize) -> usize {
         let range = max - min;
 
         let mut value = self.next() as usize;
-        println!("{}", self.next());
+        // println!("{}", self.next());
         loop {
             if value / range >= usize::MAX / range {
                 value = self.next() as usize;
