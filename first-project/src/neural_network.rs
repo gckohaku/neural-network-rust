@@ -147,15 +147,10 @@ impl NeuralNetwork {
         self.nodes[0] = inputs.clone();
         self.nodes_after_activation[0] = inputs.clone();
 
-        println!("{}", self.weights.len());
-
         for i in 1..self.nodes.len() {
             self.nodes[i] = (&self.nodes_after_activation[i - 1] * &self.weights[i - 1]
                 + &self.biases[i - 1])
                 .unwrap();
-
-            println!("{}", i);
-            println!("{:?}", self.output_activation_type);
 
             // 出力層かつ目的関数を別途指定している場合、設定に応じて処理が分かれる
             if i >= self.weights.len()
@@ -205,8 +200,6 @@ impl NeuralNetwork {
         // softmax 関数と交差エントロピー誤差を利用する場合
         if self.output_activation_type == OutputActivationType::SoftmaxAndCrossEntropy {
             let ln_output = output_node.hadamard_function(|x| (x + 1e-10).ln());
-            println!("{:7.2}", output_node);
-            println!("{:7.2}", ln_output);
 
             mini_batch_error = expects.hadamard(&ln_output).unwrap().sum_all_elements();
         }
@@ -224,8 +217,6 @@ impl NeuralNetwork {
         // 出力層のデルタ
         self.deltas[other_output_index] = (&self.nodes[node_output_index] - expects).unwrap();
 
-        println!("other output index: {}", other_output_index);
-
         // 隠れ層のデルタ
         for i in (0..other_output_index).rev() {
             let delta = &self.deltas[i + 1];
@@ -235,15 +226,13 @@ impl NeuralNetwork {
             let da_u = u.hadamard_function(da);
 
             self.deltas[i] = (delta * &w).unwrap().hadamard(&da_u).unwrap();
-            println!("index: {}", i);
         }
 
         // 求めたデルタを用いて勾配を計算する
-        for i in (0..other_output_index).rev() {
+        for i in (0..=other_output_index).rev() {
             self.weights[i] -=
                 eta * (&self.nodes_after_activation[i].transpose() * &self.deltas[i]).unwrap();
             self.biases[i] -= eta * &self.deltas[i].mean_cols();
-            println!("{:7.2}", &self.deltas[i].mean_cols());
         }
 
         Ok(())
@@ -267,6 +256,10 @@ impl NeuralNetwork {
 
     pub fn get_output_node_value(&self) -> usize {
         self.nodes.last().unwrap().cols
+    }
+
+    pub fn get_error(&self) -> f64 {
+        self.error
     }
 
     pub fn export_ron(&self) {

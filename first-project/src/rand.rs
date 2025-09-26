@@ -94,6 +94,7 @@ impl Rand {
         let range = max - min;
 
         let mut value = self.next() as usize;
+        println!("{}", self.next());
         loop {
             if value / range >= usize::MAX / range {
                 value = self.next() as usize;
