@@ -1,6 +1,13 @@
-use std::{fmt::Display, ops::Add, process::Output};
+use std::{fmt::Display, fs::File, io::{self, BufRead, BufReader, Write}, ops::Add, process::Output, fs::write};
 
-use crate::{matrix::Matrix, output_activation_type::OutputActivationType, rand::Rand};
+use ron::ser::PrettyConfig;
+
+use crate::{
+    matrix::Matrix,
+    output_activation_type::OutputActivationType,
+    rand::Rand,
+    ron_data::{LayerInfo, RonNNData},
+};
 
 #[derive(Debug, Clone)]
 pub struct NeuralNetwork {
@@ -79,8 +86,8 @@ impl NeuralNetwork {
                     }
                 }
                 weights.push(layer_weights);
-                // バイアス行列のサイズは現在の層のノードのサイズと同じ
-                biases.push(Matrix::new_and_fill(sample_value, nodes_values[i], 0.0));
+                // バイアス行列のサイズは 1 x 現在の層のノードの数
+                biases.push(Matrix::new_and_fill(1, nodes_values[i], 0.0));
                 // デルタ行列のサイズも現在の層のノードのサイズと同じ
                 deltas.push(Matrix::new_and_fill(sample_value, nodes_values[i], 0.0));
             }
@@ -148,7 +155,8 @@ impl NeuralNetwork {
                 .unwrap();
 
             // 出力層かつ目的関数を別途指定している場合、設定に応じて処理が分かれる
-            if i >= self.nodes.len() && self.output_activation_type != OutputActivationType::Default
+            if i >= self.weights.len()
+                && self.output_activation_type != OutputActivationType::Default
             {
                 // softmax 関数と交差エントロピー誤差を利用する場合
                 if self.output_activation_type == OutputActivationType::SoftmaxAndCrossEntropy {
@@ -170,15 +178,15 @@ impl NeuralNetwork {
                     // 総和行列を作成する　ブロードキャストできるようにしているので、各サンプルの要素は一つでいい
                     let mut node_sums: Vec<f64> = Vec::new();
                     for s in 0..sample_size {
-                        node_sums.push(self.nodes[i].sum_row_elements(s));
+                        node_sums.push(exp_output.sum_row_elements(s));
                     }
                     let mut sum_matrix = Matrix::new_from_vec(sample_size, 1, node_sums).unwrap();
 
-                    let sigmoid_result = exp_output
+                    let softmax_result = exp_output
                         .hadamard(&sum_matrix.hadamard_function(|x| 1.0 / (x + 1e-10)))
                         .unwrap();
 
-                    self.nodes_after_activation.push(sigmoid_result);
+                    self.nodes_after_activation[i] = softmax_result;
                 }
             } else {
                 self.nodes_after_activation[i] =
@@ -189,11 +197,11 @@ impl NeuralNetwork {
         // 誤差を求める　求めた後にサンプル数で除算
         let mut mini_batch_error = 0.0;
 
-        let mut output_node = self.nodes[output_index].clone();
+        let mut output_node = self.nodes_after_activation[output_index].clone();
 
         // softmax 関数と交差エントロピー誤差を利用する場合
         if self.output_activation_type == OutputActivationType::SoftmaxAndCrossEntropy {
-            let ln_output = output_node.hadamard_function(|x| x.ln());
+            let ln_output = output_node.hadamard_function(|x| (x + 1e-10).ln());
 
             mini_batch_error = expects.hadamard(&ln_output).unwrap().sum_all_elements();
         }
@@ -212,7 +220,7 @@ impl NeuralNetwork {
         self.deltas[other_output_index] = (&self.nodes[node_output_index] - expects).unwrap();
 
         // 隠れ層のデルタ
-        for i in (0..other_output_index - 1).rev() {
+        for i in (0..other_output_index).rev() {
             let delta = &self.deltas[i + 1];
             let w = self.weights[i + 1].transpose();
             let u = &mut self.nodes[i + 1];
@@ -223,18 +231,25 @@ impl NeuralNetwork {
         }
 
         // 求めたデルタを用いて勾配を計算する
-        for i in (0..other_output_index).rev() {
-            self.weights[i] = (self.weights[i].clone() - eta * (self.nodes_after_activation[i].transpose()) * self.deltas[i].clone()).unwrap();
-            self.biases[i] = (self.biases[i].clone() - (eta * self.deltas[i].clone())).unwrap();
+        for i in (0..=other_output_index).rev() {
+            self.weights[i] -=
+                eta * (&self.nodes_after_activation[i].transpose() * &self.deltas[i]).unwrap();
+            self.biases[i] -= eta * &self.deltas[i].mean_cols();
         }
 
         Ok(())
     }
 
     pub fn change_sample_size(&mut self, sample_size: usize) {
-        self.nodes.iter_mut().for_each(|m| m.change_row_size(sample_size));
-        self.nodes_after_activation.iter_mut().for_each(|m| m.change_row_size(sample_size));
-        self.deltas.iter_mut().for_each(|m| m.change_row_size(sample_size));
+        self.nodes
+            .iter_mut()
+            .for_each(|m| m.change_row_size(sample_size));
+        self.nodes_after_activation
+            .iter_mut()
+            .for_each(|m| m.change_row_size(sample_size));
+        self.deltas
+            .iter_mut()
+            .for_each(|m| m.change_row_size(sample_size));
     }
 
     pub fn get_input_node_value(&self) -> usize {
@@ -243,6 +258,39 @@ impl NeuralNetwork {
 
     pub fn get_output_node_value(&self) -> usize {
         self.nodes.last().unwrap().cols
+    }
+
+    pub fn get_error(&self) -> f64 {
+        self.error
+    }
+
+    pub fn export_ron(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let mut node_values = Vec::<usize>::new();
+        let mut layer_infos = Vec::<LayerInfo>::new();
+
+        node_values.push(self.nodes[0].cols);
+
+        for i in 0..self.weights.len() {
+            let info = LayerInfo {
+                weights: self.weights[i].data.clone(),
+                biases: self.biases[i].data.clone(),
+            };
+
+            layer_infos.push(info);
+            node_values.push(self.weights[i].cols);
+        }
+
+        let nn_ron_data = RonNNData {
+            layer_value: self.weights.len(),
+            node_values,
+            layers: layer_infos,
+        };
+
+        println!("{}", ron::ser::to_string_pretty(&nn_ron_data, PrettyConfig::new()).unwrap());
+
+        std::fs::write("src/models/data.ron", ron::ser::to_string_pretty(&nn_ron_data, PrettyConfig::new()).unwrap())?;
+
+        Ok(())
     }
 }
 

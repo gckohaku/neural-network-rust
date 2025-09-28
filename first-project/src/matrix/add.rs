@@ -20,15 +20,15 @@ impl ops::AddAssign<Matrix> for Matrix {
 // Matrix += &Matrix
 impl ops::AddAssign<&Matrix> for Matrix {
     fn add_assign(&mut self, rhs: &Matrix) {
-        if self.rows == rhs.rows && self.cols == rhs.cols {
-            for i in 0..self.rows {
-                for j in 0..self.cols {
-                    let sum = self.get(i, j).unwrap() + rhs.get(i, j).unwrap();
-                    self.set(i, j, sum).unwrap();
-                }
+        if self.rows % rhs.rows != 0 || self.cols % rhs.cols != 0 {
+            panic!("Matrices must have the same size or able to broadcast for addition");
+        }
+
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                let sum = self[(i, j)] + rhs[(i % rhs.rows, j % rhs.cols)];
+                self.set(i, j, sum).unwrap();
             }
-        } else {
-            panic!("Matrices must have the same size for addition");
         }
     }
 }
@@ -48,13 +48,13 @@ impl ops::Add<Matrix> for Matrix {
     type Output = Result<Matrix, String>;
 
     fn add(self, rhs: Self) -> Self::Output {
-        if self.rows == rhs.rows && self.cols == rhs.cols {
-            let mut result = self.clone();
-            result += rhs;
-            Ok(result)
-        } else {
-            panic!("Matrices must have the same size for addition")
+        if self.rows % rhs.rows != 0 || self.cols % rhs.cols != 0 {
+            panic!("Matrices must have the same size or able to broadcast for addition");
         }
+
+        let mut result = self.clone();
+        result += rhs;
+        Ok(result)
     }
 }
 
@@ -63,13 +63,13 @@ impl ops::Add<&Matrix> for &Matrix {
     type Output = Result<Matrix, String>;
 
     fn add(self, rhs: &Matrix) -> Self::Output {
-        if self.rows == rhs.rows && self.cols == rhs.cols {
-            let mut result = self.clone();
-            result += rhs;
-            Ok(result)
-        } else {
-            Err("Matrices must have the same size for addition".to_string())
+        if self.rows % rhs.rows != 0 || self.cols % rhs.cols != 0 {
+            panic!("Matrices must have the same size or able to broadcast for addition");
         }
+
+        let mut result = self.clone();
+        result += rhs;
+        Ok(result)
     }
 }
 
