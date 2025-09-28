@@ -1,5 +1,7 @@
 use std::{fmt::Display, ops::Add, process::Output};
 
+use ron::ser::PrettyConfig;
+
 use crate::{
     matrix::Matrix,
     output_activation_type::OutputActivationType,
@@ -284,7 +286,7 @@ impl NeuralNetwork {
             layers: layer_infos,
         };
 
-        println!("{}", ron::to_string(&nn_ron_data).unwrap())
+        println!("{}", ron::ser::to_string_pretty(&nn_ron_data, PrettyConfig::new()).unwrap())
     }
 }
 
