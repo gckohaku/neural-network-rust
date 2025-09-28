@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::Add, process::Output};
+use std::{fmt::Display, fs::File, io::{self, BufRead, BufReader, Write}, ops::Add, process::Output, fs::write};
 
 use ron::ser::PrettyConfig;
 
@@ -264,7 +264,7 @@ impl NeuralNetwork {
         self.error
     }
 
-    pub fn export_ron(&self) {
+    pub fn export_ron(&self) -> Result<(), Box<dyn std::error::Error>> {
         let mut node_values = Vec::<usize>::new();
         let mut layer_infos = Vec::<LayerInfo>::new();
 
@@ -286,7 +286,11 @@ impl NeuralNetwork {
             layers: layer_infos,
         };
 
-        println!("{}", ron::ser::to_string_pretty(&nn_ron_data, PrettyConfig::new()).unwrap())
+        println!("{}", ron::ser::to_string_pretty(&nn_ron_data, PrettyConfig::new()).unwrap());
+
+        std::fs::write("src/models/data.ron", ron::ser::to_string_pretty(&nn_ron_data, PrettyConfig::new()).unwrap())?;
+
+        Ok(())
     }
 }
 
