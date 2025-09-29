@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, collections::HashMap};
 
 use crate::{
-    iris_nn::iris_nn_process, matrix::Matrix, neural_network::{differential_relu, relu, NeuralNetwork}, output_activation_type::OutputActivationType, rand::Rand
+    iris_nn::{iris_analyze, iris_nn_process}, matrix::Matrix, neural_network::{differential_relu, relu, NeuralNetwork}, output_activation_type::OutputActivationType, rand::Rand
 };
 
 mod matrix;
@@ -14,5 +14,5 @@ mod iris_nn;
 fn main() {
     // iris_nn_process();
 
-    
+    iris_analyze();
 }

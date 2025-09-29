@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     matrix::Matrix, neural_network::*, output_activation_type::OutputActivationType, rand::Rand,
 };
@@ -113,26 +115,14 @@ pub fn iris_analyze() {
     // 最小値、最大値、中央値、平均値、最頻値
     let mut maximums = IrisValues::new();
     let mut minimums = IrisValues::new();
-    let mut means = IrisValues::new();
+    let mut medians = IrisValues::new();
     let mut averages = IrisValues::new();
     let mut modes = IrisValues::new();
 
-    let sepal_lengths: Vec<f32> = irisdata::IRIS_DATA
-        .iter()
-        .map(|d| d.sepal_length)
-        .collect();
-    let sepal_width: Vec<f32> = irisdata::IRIS_DATA
-        .iter()
-        .map(|d| d.sepal_width)
-        .collect();
-    let petal_length: Vec<f32> = irisdata::IRIS_DATA
-        .iter()
-        .map(|d| d.petal_length)
-        .collect();
-    let petal_width: Vec<f32> = irisdata::IRIS_DATA
-        .iter()
-        .map(|d| d.petal_width)
-        .collect();
+    let sepal_lengths: Vec<f32> = irisdata::IRIS_DATA.iter().map(|d| d.sepal_length).collect();
+    let sepal_width: Vec<f32> = irisdata::IRIS_DATA.iter().map(|d| d.sepal_width).collect();
+    let petal_length: Vec<f32> = irisdata::IRIS_DATA.iter().map(|d| d.petal_length).collect();
+    let petal_width: Vec<f32> = irisdata::IRIS_DATA.iter().map(|d| d.petal_width).collect();
 
     maximums.sepal_length = sepal_lengths.iter().fold(0.0 / 0.0, |m, v| v.max(m));
     maximums.sepal_width = sepal_width.iter().fold(0.0 / 0.0, |m, v| v.max(m));
@@ -149,23 +139,66 @@ pub fn iris_analyze() {
     averages.petal_length = petal_length.iter().sum::<f32>() / petal_length.len() as f32;
     averages.petal_width = petal_width.iter().sum::<f32>() / petal_width.len() as f32;
 
-    for datum in irisdata::IRIS_DATA {
+    let half_index = irisdata::IRIS_DATA.len() / 2;
+    println!("half index: {}", half_index);
 
-        //         maximums.sepal_length = maximums.sepal_length.max(datum.sepal_length as f64);
-        //         maximums.sepal_width = maximums.sepal_width.max(datum.sepal_width as f64);
-        //         maximums.petal_length = maximums.petal_length.max(datum.petal_length as f64);
-        //         maximums.petal_width = maximums.petal_width.max(datum.petal_width as f64);
+    let mut sorted_sepal_lengths = sepal_lengths.clone();
+    sorted_sepal_lengths.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let mut sorted_sepal_width = sepal_width.clone();
+    sorted_sepal_width.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let mut sorted_petal_lengths = petal_length.clone();
+    sorted_petal_lengths.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let mut sorted_petal_width = petal_width.clone();
+    sorted_petal_width.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-        //         minimums.sepal_length = minimums.sepal_length.min(datum.sepal_length as f64);
-        //         minimums.sepal_width = minimums.sepal_width.min(datum.sepal_width as f64);
-        //         minimums.petal_length = minimums.petal_length.min(datum.petal_length as f64);
-        //         minimums.petal_width = minimums.petal_width.min(datum.petal_width as f64);
-
-        //         averages.sepal_length
-        // averages.sepal_width
-        // averages.petal_length
-        // averages.petal_width
+    if irisdata::IRIS_DATA.len() % 2 == 0 {
+        medians.sepal_length =
+            (sorted_sepal_lengths[half_index] + sorted_sepal_lengths[half_index - 1]) / 2.0;
+        medians.sepal_width =
+            (sorted_sepal_width[half_index] + sorted_sepal_width[half_index - 1]) / 2.0;
+        medians.petal_length =
+            (sorted_petal_lengths[half_index] + sorted_petal_lengths[half_index - 1]) / 2.0;
+        medians.petal_width =
+            (sorted_petal_width[half_index] + sorted_petal_width[half_index - 1]) / 2.0;
+    } else {
+        medians.sepal_length = sorted_sepal_lengths[half_index];
+        medians.sepal_width = sorted_sepal_width[half_index];
+        medians.petal_length = sorted_petal_lengths[half_index];
+        medians.petal_width = sorted_petal_width[half_index];
     }
 
+    // let mut sepal_length_map = HashMap::<f32, usize>::new();
+    // let mut sepal_width_map = HashMap::<f32, usize>::new();
+    // let mut petal_length_map = HashMap::<f32, usize>::new();
+    // let mut petal_width_map = HashMap::<f32, usize>::new();
+
+    for datum in irisdata::IRIS_DATA {}
+
     // 範囲、分散 (標準偏差)、歪度、尖度
+
+
+    println!("maximums:");
+    println!("  sepal length: {}", maximums.sepal_length);
+    println!("  sepal width: {}", maximums.sepal_width);
+    println!("  petal length: {}", maximums.petal_length);
+    println!("  petal width: {}", maximums.petal_width);
+
+    println!("minimums:");
+    println!("  sepal length: {}", minimums.sepal_length);
+    println!("  sepal width: {}", minimums.sepal_width);
+    println!("  petal length: {}", minimums.petal_length);
+    println!("  petal width: {}", minimums.petal_width);
+
+    println!("averages:");
+    println!("  sepal length: {}", averages.sepal_length);
+    println!("  sepal width: {}", averages.sepal_width);
+    println!("  petal length: {}", averages.petal_length);
+    println!("  petal width: {}", averages.petal_width);
+
+    println!("medians:");
+    println!("  sepal length: {}", medians.sepal_length);
+    println!("  sepal width: {}", medians.sepal_width);
+    println!("  petal length: {}", medians.petal_length);
+    println!("  petal width: {}", medians.petal_width);
+
 }
