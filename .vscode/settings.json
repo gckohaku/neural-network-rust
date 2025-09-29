@@ -21,9 +21,12 @@
     "cSpell.words": [
         "hadamard",
         "Hadamard",
+        "irisdata",
         "relu",
         "rotr",
+        "Setosa",
         "softmax",
+        "Virginica",
         "xorshift"
     ],
     "editor.comments.insertSpace": true,

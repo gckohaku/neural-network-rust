@@ -288,7 +288,7 @@ impl NeuralNetwork {
 
         println!("{}", ron::ser::to_string_pretty(&nn_ron_data, PrettyConfig::new()).unwrap());
 
-        std::fs::write("src/models/data.ron", ron::ser::to_string_pretty(&nn_ron_data, PrettyConfig::new()).unwrap())?;
+        std::fs::write("models/data.ron", ron::ser::to_string_pretty(&nn_ron_data, PrettyConfig::new()).unwrap())?;
 
         Ok(())
     }
