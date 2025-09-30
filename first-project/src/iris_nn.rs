@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{arch::x86_64::_mm_sm4key4_epi32, collections::HashMap};
 
 use crate::{
     matrix::Matrix, neural_network::*, output_activation_type::OutputActivationType, rand::Rand,
@@ -112,12 +112,19 @@ impl IrisValues {
 }
 
 pub fn iris_analyze() {
-    // 最小値、最大値、中央値、平均値、最頻値
+    let data_value = irisdata::IRIS_DATA.len();
+
+    // 最小値、最大値、中央値、平均値
     let mut maximums = IrisValues::new();
     let mut minimums = IrisValues::new();
     let mut medians = IrisValues::new();
     let mut averages = IrisValues::new();
-    let mut modes = IrisValues::new();
+
+    // 範囲、分散 (標準偏差)、歪度、尖度
+    let mut ranges = IrisValues::new();
+    let mut variances = IrisValues::new();
+    let mut skewness = IrisValues::new();
+    let mut kurtosis = IrisValues::new();
 
     let sepal_lengths: Vec<f32> = irisdata::IRIS_DATA.iter().map(|d| d.sepal_length).collect();
     let sepal_width: Vec<f32> = irisdata::IRIS_DATA.iter().map(|d| d.sepal_width).collect();
@@ -134,10 +141,10 @@ pub fn iris_analyze() {
     minimums.petal_length = petal_length.iter().fold(0.0 / 0.0, |m, v| v.min(m));
     minimums.petal_width = petal_width.iter().fold(0.0 / 0.0, |m, v| v.min(m));
 
-    averages.sepal_length = sepal_lengths.iter().sum::<f32>() / sepal_lengths.len() as f32;
-    averages.sepal_width = sepal_width.iter().sum::<f32>() / sepal_width.len() as f32;
-    averages.petal_length = petal_length.iter().sum::<f32>() / petal_length.len() as f32;
-    averages.petal_width = petal_width.iter().sum::<f32>() / petal_width.len() as f32;
+    (averages.sepal_length, variances.sepal_length) = calc_average_and_variance(&sepal_lengths);
+    (averages.sepal_width, variances.sepal_width) = calc_average_and_variance(&sepal_width);
+    (averages.petal_length, variances.petal_length) = calc_average_and_variance(&petal_length);
+    (averages.petal_width, variances.petal_width) = calc_average_and_variance(&petal_width);
 
     let half_index = irisdata::IRIS_DATA.len() / 2;
     println!("half index: {}", half_index);
@@ -167,38 +174,97 @@ pub fn iris_analyze() {
         medians.petal_width = sorted_petal_width[half_index];
     }
 
-    // let mut sepal_length_map = HashMap::<f32, usize>::new();
-    // let mut sepal_width_map = HashMap::<f32, usize>::new();
-    // let mut petal_length_map = HashMap::<f32, usize>::new();
-    // let mut petal_width_map = HashMap::<f32, usize>::new();
+    ranges.sepal_length = maximums.sepal_length - minimums.sepal_length;
+    ranges.sepal_width = maximums.sepal_width - minimums.sepal_width;
+    ranges.petal_length = maximums.petal_length - minimums.petal_length;
+    ranges.petal_width = maximums.petal_width - minimums.petal_width;
 
-    for datum in irisdata::IRIS_DATA {}
+    
 
-    // 範囲、分散 (標準偏差)、歪度、尖度
+    // 結果の出力
+    println!("sepal length:");
+    println!("  maximum: {}", maximums.sepal_length);
+    println!("  minimum: {}", minimums.sepal_length);
+    println!("  average: {}", averages.sepal_length);
+    println!("  median : {}", medians.sepal_length);
 
+    println!("sepal width:");
+    println!("  maximum: {}", maximums.sepal_width);
+    println!("  minimum: {}", minimums.sepal_width);
+    println!("  average: {}", averages.sepal_width);
+    println!("  median : {}", medians.sepal_width);
 
-    println!("maximums:");
-    println!("  sepal length: {}", maximums.sepal_length);
-    println!("  sepal width: {}", maximums.sepal_width);
-    println!("  petal length: {}", maximums.petal_length);
-    println!("  petal width: {}", maximums.petal_width);
+    println!("petal length:");
+    println!("  maximum: {}", maximums.petal_length);
+    println!("  minimum: {}", minimums.petal_length);
+    println!("  average: {}", averages.petal_length);
+    println!("  median : {}", medians.petal_length);
 
-    println!("minimums:");
-    println!("  sepal length: {}", minimums.sepal_length);
-    println!("  sepal width: {}", minimums.sepal_width);
-    println!("  petal length: {}", minimums.petal_length);
-    println!("  petal width: {}", minimums.petal_width);
-
-    println!("averages:");
-    println!("  sepal length: {}", averages.sepal_length);
-    println!("  sepal width: {}", averages.sepal_width);
-    println!("  petal length: {}", averages.petal_length);
-    println!("  petal width: {}", averages.petal_width);
-
-    println!("medians:");
-    println!("  sepal length: {}", medians.sepal_length);
-    println!("  sepal width: {}", medians.sepal_width);
-    println!("  petal length: {}", medians.petal_length);
-    println!("  petal width: {}", medians.petal_width);
-
+    println!("petal width:");
+    println!("  maximum: {}", maximums.petal_width);
+    println!("  minimum: {}", minimums.petal_width);
+    println!("  average: {}", averages.petal_width);
+    println!("  median : {}", medians.petal_width);
 }
+
+fn kahan_sum_once_f32(data: f32, sum: &mut f32, c: &mut f32) {
+    let y = data - *c;
+    let t = *sum + y;
+    *c = (t - *sum) - y;
+    *sum = t;
+}
+
+fn kahan_sum_f32(data: &Vec<f32>) -> f32 {
+    let mut sum = 0.0f32;
+    let mut c = 0.0f32;
+
+    for i in 0..data.len() {
+        kahan_sum_once_f32(data[i], &mut sum, &mut c);
+    }
+
+    sum
+}
+
+pub fn calc_average_and_variance(data: &Vec<f32>) -> (f32, f32) {
+    let data_value = data.len();
+
+    let mut average = 0.0f32;
+    let mut variance = 0.0f32;
+    let mut c_average = 0.0f32;
+    let mut c_variance = 0.0f32;
+
+    for i in 0..data_value {
+        println!("index {}:", i);
+        println!("  before: {}", average);
+        let delta_1 = data[i] - average;
+        kahan_sum_once_f32(delta_1 / (i as f32 + 1.0), &mut average, &mut c_average);
+        let delta_2 = data[i] - average;
+        kahan_sum_once_f32(delta_1 * delta_2, &mut variance, &mut c_variance);
+        println!("  after : {}", average);
+    }
+
+    (average, variance)
+}
+
+fn calc_skewness(data: &Vec<f32>, average: f32, variance: f32) -> f32 {
+    let data_value = data.len();
+
+    let mut skewness = 0.0f32;
+    let mut c = 0.0f32;
+
+    for i in 0..data_value {
+        println!("index {}:", i);
+        println!("  before: {}", skewness);
+        let delta_1 = data[i] - average;
+        kahan_sum_once_f32((delta_1 / variance.sqrt()).powi(3), &mut skewness, &mut c);
+        println!("  after : {}", skewness);
+    }
+
+    let n = data_value as f32;
+    (n / ((n - 1.0) * (n - 2.0))) * skewness
+}
+
+// https://data-viz-lab.com/stats#1-3median
+// https://bellcurve.jp/statistics/course/17950.html?srsltid=AfmBOorSvnzQ2VbbF0zl1FEPcJPezuEky5RmhmDf5cK_I6S0ZMxvePNk
+// https://bellcurve.jp/statistics/glossary/2113.html
+// https://zenn.dev/utcarnivaldayo/articles/ffeed5ac2e62bb
