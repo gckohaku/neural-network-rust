@@ -1,4 +1,4 @@
-use crate::iris_nn::{calc_average_and_variance, iris_analyze};
+use crate::iris_nn::{calc_average_and_variance, calc_kurtosis, calc_skewness, iris_analyze};
 
 mod iris_nn;
 mod matrix;
@@ -10,5 +10,16 @@ mod ron_data;
 fn main() {
     // iris_nn_process();
 
-    iris_analyze();
+    // iris_analyze();
+
+    let data = vec![3.0, 4.0, 5.0, 2.0, 3.0, 4.0, 5.0, 6.0, 4.0, 7.0];
+    let (average, variance ) = calc_average_and_variance(&data);
+    let skewness = calc_skewness(&data, average, variance);
+    let kurtosis = calc_kurtosis(&data, average, variance);
+
+    println!("average : {}", average);
+    println!("variance: {}", variance);
+    println!("standard: {}", variance.sqrt());
+    println!("skewness: {}", skewness);
+    println!("kurtosis: {}", kurtosis);
 }

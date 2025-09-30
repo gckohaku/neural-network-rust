@@ -179,8 +179,6 @@ pub fn iris_analyze() {
     ranges.petal_length = maximums.petal_length - minimums.petal_length;
     ranges.petal_width = maximums.petal_width - minimums.petal_width;
 
-    
-
     // 結果の出力
     println!("sepal length:");
     println!("  maximum: {}", maximums.sepal_length);
@@ -234,34 +232,44 @@ pub fn calc_average_and_variance(data: &Vec<f32>) -> (f32, f32) {
     let mut c_variance = 0.0f32;
 
     for i in 0..data_value {
-        println!("index {}:", i);
-        println!("  before: {}", average);
         let delta_1 = data[i] - average;
         kahan_sum_once_f32(delta_1 / (i as f32 + 1.0), &mut average, &mut c_average);
         let delta_2 = data[i] - average;
         kahan_sum_once_f32(delta_1 * delta_2, &mut variance, &mut c_variance);
-        println!("  after : {}", average);
     }
 
-    (average, variance)
+    (average, variance / data_value as f32)
 }
 
-fn calc_skewness(data: &Vec<f32>, average: f32, variance: f32) -> f32 {
+pub fn calc_skewness(data: &Vec<f32>, average: f32, variance: f32) -> f32 {
     let data_value = data.len();
 
     let mut skewness = 0.0f32;
     let mut c = 0.0f32;
 
     for i in 0..data_value {
-        println!("index {}:", i);
-        println!("  before: {}", skewness);
         let delta_1 = data[i] - average;
         kahan_sum_once_f32((delta_1 / variance.sqrt()).powi(3), &mut skewness, &mut c);
-        println!("  after : {}", skewness);
     }
 
     let n = data_value as f32;
-    (n / ((n - 1.0) * (n - 2.0))) * skewness
+    skewness / n
+}
+
+pub fn calc_kurtosis(data: &Vec<f32>, average: f32, variance: f32) -> f32 {
+    let data_value = data.len();
+
+    let mut kurtosis = 0.0f32;
+    let mut c = 0.0f32;
+
+    for i in 0..data_value {
+        let delta_1 = data[i] - average;
+        kahan_sum_once_f32((delta_1 / variance.sqrt()).powi(4), &mut kurtosis, &mut c);
+    }
+
+    let n = data_value as f32;
+    (((n * (n + 1.0)) / ((n - 1.0) * (n - 2.0) * (n - 3.0))) * kurtosis)
+        - ((3.0 * (n - 1.0).powi(2)) / ((n - 2.0) * (n - 3.0)))
 }
 
 // https://data-viz-lab.com/stats#1-3median
