@@ -11,7 +11,7 @@ pub fn iris_nn_process() {
     let mini_batch_sample_size = 10;
 
     // iris dataset 用ニューラルネットワーク
-    let mut nn = NeuralNetwork::new(vec![4, 6, 8, 6, 4, 3], mini_batch_sample_size);
+    let mut nn = NeuralNetwork::new(vec![4, 8, 16, 12, 6, 3], mini_batch_sample_size);
     nn.set_activations(&mut vec![relu, relu, relu, relu, relu]);
     nn.set_differential_activation(&mut vec![
         differential_relu,
@@ -22,18 +22,18 @@ pub fn iris_nn_process() {
     ]);
     nn.set_output_activation_type(OutputActivationType::SoftmaxAndCrossEntropy);
 
-    let epoch_value = 1000;
+    let epoch_value = 50000;
     let mut r = Rand::new();
 
     for epoch in 0..epoch_value {
-        let shuffle_index = generate_shuffle_array(irisdata::IRIS_DATA.len(), &mut r);
+        let shuffle_index = generate_shuffle_array(normalization_data.len(), &mut r);
         let mut epoch_error = 0.0;
 
         for indexes in shuffle_index.chunks(mini_batch_sample_size) {
             let mut batch = Vec::new();
 
             for index in indexes {
-                batch.push(&irisdata::IRIS_DATA[*index]);
+                batch.push(&normalization_data[*index]);
             }
 
             let mut batch_data: Vec<f64> = Vec::new();
@@ -75,10 +75,10 @@ pub fn iris_nn_process() {
 
             nn.forward(&inputs, &expects).unwrap();
             epoch_error += nn.get_error();
-            nn.backward(&expects, 0.00001).unwrap();
+            nn.backward(&expects, 0.001).unwrap();
         }
 
-        println!("epoch {:6} error: {:13.10}", epoch + 1, epoch_error);
+        println!("epoch {:6} error: {:13.10}", epoch + 1, epoch_error / mini_batch_sample_size as f64);
     }
 
     nn.export_ron();
@@ -128,6 +128,9 @@ pub fn iris_analyze() {
     let mut skewnesses = IrisValues::new();
     let mut kurtosises = IrisValues::new();
 
+    // 不偏分散
+    let mut unbiased = IrisValues::new();
+
     let sepal_length: Vec<f32> = irisdata::IRIS_DATA.iter().map(|d| d.sepal_length).collect();
     let sepal_width: Vec<f32> = irisdata::IRIS_DATA.iter().map(|d| d.sepal_width).collect();
     let petal_length: Vec<f32> = irisdata::IRIS_DATA.iter().map(|d| d.petal_length).collect();
@@ -143,10 +146,10 @@ pub fn iris_analyze() {
     minimums.petal_length = petal_length.iter().fold(0.0 / 0.0, |m, v| v.min(m));
     minimums.petal_width = petal_width.iter().fold(0.0 / 0.0, |m, v| v.min(m));
 
-    (averages.sepal_length, variances.sepal_length) = calc_average_and_variance(&sepal_length);
-    (averages.sepal_width, variances.sepal_width) = calc_average_and_variance(&sepal_width);
-    (averages.petal_length, variances.petal_length) = calc_average_and_variance(&petal_length);
-    (averages.petal_width, variances.petal_width) = calc_average_and_variance(&petal_width);
+    (averages.sepal_length, variances.sepal_length, unbiased.sepal_length) = calc_average_and_variance(&sepal_length);
+    (averages.sepal_width, variances.sepal_width, unbiased.sepal_width) = calc_average_and_variance(&sepal_width);
+    (averages.petal_length, variances.petal_length, unbiased.petal_length) = calc_average_and_variance(&petal_length);
+    (averages.petal_width, variances.petal_width, unbiased.petal_width) = calc_average_and_variance(&petal_width);
 
     let half_index = irisdata::IRIS_DATA.len() / 2;
     println!("half index: {}", half_index);
@@ -250,7 +253,7 @@ fn kahan_sum_once_f32(data: f32, sum: &mut f32, c: &mut f32) {
 //     sum
 // }
 
-pub fn calc_average_and_variance(data: &Vec<f32>) -> (f32, f32) {
+pub fn calc_average_and_variance(data: &Vec<f32>) -> (f32, f32, f32) {
     let data_value = data.len();
 
     let mut average = 0.0f32;
@@ -265,7 +268,8 @@ pub fn calc_average_and_variance(data: &Vec<f32>) -> (f32, f32) {
         kahan_sum_once_f32(delta_1 * delta_2, &mut variance, &mut c_variance);
     }
 
-    (average, variance / data_value as f32)
+    let n = data_value as f32;
+    (average, variance / n, variance / (n - 1.0))
 }
 
 pub fn calc_skewness(data: &Vec<f32>, average: f32, variance: f32) -> f32 {

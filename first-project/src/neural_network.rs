@@ -206,7 +206,7 @@ impl NeuralNetwork {
             mini_batch_error = expects.hadamard(&ln_output).unwrap().sum_all_elements();
         }
 
-        self.error = mini_batch_error / self.nodes[output_index].rows as f64;
+        self.error = -(mini_batch_error / self.nodes[output_index].rows as f64);
 
         Ok(())
     }
