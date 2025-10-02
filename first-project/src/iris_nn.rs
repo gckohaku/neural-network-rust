@@ -1,19 +1,22 @@
 use std::{arch::x86_64::_mm_sm4key4_epi32, collections::HashMap};
 
 use crate::{
-    iris_normalization::iris_normalization, matrix::Matrix, neural_network::*, output_activation_type::OutputActivationType, rand::Rand
+    iris_normalization::iris_normalization, matrix::Matrix, neural_network::*,
+    output_activation_type::OutputActivationType, rand::Rand,
 };
 
 pub fn iris_nn_process() {
     let normalization_data = iris_normalization(&irisdata::IRIS_DATA);
+    // println!("{:?}", &normalization_data);
 
     // ミニバッチ内のサンプルサイズを指定
     let mini_batch_sample_size = 10;
 
     // iris dataset 用ニューラルネットワーク
-    let mut nn = NeuralNetwork::new(vec![4, 8, 16, 12, 6, 3], mini_batch_sample_size);
-    nn.set_activations(&mut vec![relu, relu, relu, relu, relu]);
+    let mut nn = NeuralNetwork::new(vec![4, 12, 24, 36, 24, 12, 3], mini_batch_sample_size);
+    nn.set_activations(&mut vec![relu, relu, relu, relu, relu, relu]);
     nn.set_differential_activation(&mut vec![
+        differential_relu,
         differential_relu,
         differential_relu,
         differential_relu,
@@ -75,10 +78,17 @@ pub fn iris_nn_process() {
 
             nn.forward(&inputs, &expects).unwrap();
             epoch_error += nn.get_error();
-            nn.backward(&expects, 0.001).unwrap();
+            nn.backward(&expects, 0.0007).unwrap();
         }
 
-        println!("epoch {:6} error: {:13.10}", epoch + 1, epoch_error / mini_batch_sample_size as f64);
+        if (epoch + 1) % 500 == 0 {
+            println!(
+                "epoch {:6} error: {:13.10}",
+                epoch + 1,
+                epoch_error / irisdata::IRIS_DATA.len() as f64
+            );
+            // print!("{:8.4}", nn.get_output_nodes());
+        }
     }
 
     nn.export_ron();
@@ -146,10 +156,26 @@ pub fn iris_analyze() {
     minimums.petal_length = petal_length.iter().fold(0.0 / 0.0, |m, v| v.min(m));
     minimums.petal_width = petal_width.iter().fold(0.0 / 0.0, |m, v| v.min(m));
 
-    (averages.sepal_length, variances.sepal_length, unbiased.sepal_length) = calc_average_and_variance(&sepal_length);
-    (averages.sepal_width, variances.sepal_width, unbiased.sepal_width) = calc_average_and_variance(&sepal_width);
-    (averages.petal_length, variances.petal_length, unbiased.petal_length) = calc_average_and_variance(&petal_length);
-    (averages.petal_width, variances.petal_width, unbiased.petal_width) = calc_average_and_variance(&petal_width);
+    (
+        averages.sepal_length,
+        variances.sepal_length,
+        unbiased.sepal_length,
+    ) = calc_average_and_variance(&sepal_length);
+    (
+        averages.sepal_width,
+        variances.sepal_width,
+        unbiased.sepal_width,
+    ) = calc_average_and_variance(&sepal_width);
+    (
+        averages.petal_length,
+        variances.petal_length,
+        unbiased.petal_length,
+    ) = calc_average_and_variance(&petal_length);
+    (
+        averages.petal_width,
+        variances.petal_width,
+        unbiased.petal_width,
+    ) = calc_average_and_variance(&petal_width);
 
     let half_index = irisdata::IRIS_DATA.len() / 2;
     println!("half index: {}", half_index);

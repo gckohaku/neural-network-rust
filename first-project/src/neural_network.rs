@@ -206,7 +206,7 @@ impl NeuralNetwork {
             mini_batch_error = expects.hadamard(&ln_output).unwrap().sum_all_elements();
         }
 
-        self.error = -(mini_batch_error / self.nodes[output_index].rows as f64);
+        self.error = -mini_batch_error;
 
         Ok(())
     }
@@ -260,8 +260,13 @@ impl NeuralNetwork {
         self.nodes.last().unwrap().cols
     }
 
+    /// ミニバッチ全体の誤差であることに注意 (バッチ内のサンプルサイズで割られていない)
     pub fn get_error(&self) -> f64 {
         self.error
+    }
+
+    pub fn get_output_nodes(&self) -> &Matrix {
+        self.nodes_after_activation.last().unwrap()
     }
 
     pub fn export_ron(&self) -> Result<(), Box<dyn std::error::Error>> {
@@ -286,7 +291,7 @@ impl NeuralNetwork {
             layers: layer_infos,
         };
 
-        println!("{}", ron::ser::to_string_pretty(&nn_ron_data, PrettyConfig::new()).unwrap());
+        // println!("{}", ron::ser::to_string_pretty(&nn_ron_data, PrettyConfig::new()).unwrap());
 
         std::fs::write("models/data.ron", ron::ser::to_string_pretty(&nn_ron_data, PrettyConfig::new()).unwrap())?;
 
