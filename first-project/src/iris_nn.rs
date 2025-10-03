@@ -1,4 +1,4 @@
-use std::{arch::x86_64::_mm_sm4key4_epi32, collections::HashMap};
+use std::{arch::x86_64::_mm_sm4key4_epi32, collections::HashMap, time};
 
 use crate::{
     iris_normalization::iris_normalization, matrix::Matrix, neural_network::*,
@@ -27,6 +27,9 @@ pub fn iris_nn_process() {
 
     let epoch_value = 50000;
     let mut r = Rand::new();
+
+    // 現在の時刻
+    let epochs_now = time::Instant::now();
 
     for epoch in 0..epoch_value {
         let shuffle_index = generate_shuffle_array(normalization_data.len(), &mut r);
@@ -91,7 +94,13 @@ pub fn iris_nn_process() {
         }
     }
 
-    nn.export_ron();
+    println!("epochs process duration: {:?}sec.", epochs_now.elapsed().as_secs_f64());
+
+    let export_now = time::Instant::now();
+
+    let _ = nn.export_ron();
+
+    println!("export process duration: {:?}.", export_now.elapsed());
 }
 
 fn generate_shuffle_array(value: usize, r: &mut Rand) -> Vec<usize> {
