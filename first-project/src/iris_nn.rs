@@ -1,8 +1,7 @@
 use std::{arch::x86_64::_mm_sm4key4_epi32, collections::HashMap, time};
 
 use crate::{
-    iris_normalization::iris_normalization, matrix::Matrix, neural_network::*,
-    output_activation_type::OutputActivationType, rand::Rand,
+    cpu_info, iris_normalization::iris_normalization, matrix::Matrix, neural_network::*, output_activation_type::OutputActivationType, rand::Rand
 };
 
 pub fn iris_nn_process() {
@@ -27,6 +26,8 @@ pub fn iris_nn_process() {
 
     let epoch_value = 50000;
     let mut r = Rand::new();
+
+    println!("cpu cores: {}", *cpu_info::LOGICAL_CORES);
 
     // 現在の時刻
     let epochs_now = time::Instant::now();

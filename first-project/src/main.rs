@@ -7,6 +7,7 @@ mod output_activation_type;
 mod rand;
 mod ron_data;
 mod iris_normalization;
+mod cpu_info;
 
 fn main() {
     iris_nn_process();
