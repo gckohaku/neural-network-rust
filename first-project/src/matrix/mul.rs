@@ -1,6 +1,10 @@
-use std::ops;
+use std::{
+    ops,
+    sync::{Arc, Mutex},
+    thread,
+};
 
-use crate::matrix::{self, Matrix};
+use crate::matrix::Matrix;
 
 /* 実数との乗算 */
 // Matrix *= f64
@@ -8,7 +12,7 @@ impl ops::MulAssign<f64> for Matrix {
     fn mul_assign(&mut self, scalar: f64) {
         for i in 0..self.rows {
             for j in 0..self.cols {
-                let product = self.get(i, j).unwrap() * scalar;
+                let product = self[(i, j)] * scalar;
                 self.set(i, j, product).unwrap();
             }
         }
@@ -20,7 +24,7 @@ impl ops::MulAssign<&f64> for Matrix {
     fn mul_assign(&mut self, scalar: &f64) {
         for i in 0..self.rows {
             for j in 0..self.cols {
-                let product = self.get(i, j).unwrap() * scalar;
+                let product = self[(i, j)] * scalar;
                 self.set(i, j, product).unwrap();
             }
         }
@@ -97,14 +101,38 @@ impl ops::MulAssign<Matrix> for Matrix {
 impl ops::MulAssign<&Matrix> for Matrix {
     fn mul_assign(&mut self, rhs: &Matrix) {
         if self.cols == rhs.rows {
-            let mut result = Matrix::new(self.rows, rhs.cols);
+            let result = Matrix::new(self.rows, rhs.cols);
+            let arc_result = Arc::new(Mutex::new(result.clone()));
+            let arc_self = Arc::new(Mutex::new(self.clone()));
+            let arc_rhs = Arc::new(Mutex::new(rhs.clone()));
+
+            // println!("start:\n  self: row -> {}, col -> {}\n  rhs: row -> {}, col -> {}", self.rows, self.cols, rhs.rows, rhs.cols);
+
             for i in 0..self.rows {
+                let mut handles: Vec<thread::JoinHandle<()>> = vec![];
                 for j in 0..rhs.cols {
-                    let mut sum = 0.0;
-                    for k in 0..self.cols {
-                        sum += self.get(i, k).unwrap() * rhs.get(k, j).unwrap();
-                    }
-                    result.set(i, j, sum).unwrap();
+                    let mc_self = Arc::clone(&arc_self);
+                    let mc_rhs = Arc::clone(&arc_rhs);
+                    let mc_result = Arc::clone(&arc_result);
+
+                    let thread = thread::spawn({
+                        move || {
+                            let m_self = mc_self.lock().unwrap();
+                            let m_rhs = mc_rhs.lock().unwrap();
+                            let mut m_result = mc_result.lock().unwrap();
+                            let mut sum = 0.0;
+                            for k in 0..m_self.cols {
+                                println!("{}, {}, {}", i, j, k);
+                                sum += m_self[(i, k)] * m_rhs[(k, j)];
+                            }
+                            m_result.set(i, j, sum).unwrap();
+                        }
+                    });
+                    handles.push(thread);
+                }
+
+                for handle in handles {
+                    handle.join().unwrap();
                 }
             }
             *self = result;
