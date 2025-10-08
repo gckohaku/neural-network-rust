@@ -103,36 +103,48 @@ impl ops::MulAssign<&Matrix> for Matrix {
         if self.cols == rhs.rows {
             let cpu_cores = *cpu_info::LOGICAL_CORES;
             let result = Matrix::new(self.rows, rhs.cols);
-            let arc_result = Arc::new(result);
+            let arc_result = Arc::new(result.clone());
             let arc_self = Arc::new(self.clone());
             let arc_rhs = Arc::new(rhs.clone());
 
             // println!("start:\n  self: row -> {}, col -> {}\n  rhs: row -> {}, col -> {}", self.rows, self.cols, rhs.rows, rhs.cols);
 
+            let mut arc_results: Arc<Vec<Vec<f64>>> = Arc::new(Vec::new());
+            let mut indexes: Vec<usize> = vec![];
+
+            let data_len = result.data.len();
+            let div_value = data_len / cpu_cores;
+            let mod_value = data_len % cpu_cores;
+
+            let mut c_results = Arc::clone(&arc_results);
+            for i in 0..cpu_cores {
+                (c_results).push(Vec::new());
+                indexes.push(div_value * i + mod_value * i / cpu_cores);
+            }
+            indexes.push(data_len);
+
             let mut handles: Vec<thread::JoinHandle<()>> = vec![];
             for offset in 0..cpu_cores {
                 let mc_self = Arc::clone(&arc_self);
                 let mc_rhs = Arc::clone(&arc_rhs);
-                let results: Vec<Vec<f64>> = vec![];
 
                 let mc_result = Arc::clone(&arc_result);
+                let 
 
+                let indexes_clone = indexes.clone();
                 let thread = thread::spawn({
                     move || {
-                        let mut index = offset;
-
-                        while index < mc_self.rows * mc_rhs.cols {
+                        for index in indexes_clone[offset]..indexes_clone[offset+1] {
                             let cell_row = index / mc_rhs.cols;
                             let cell_col = index % mc_rhs.cols;
 
-                            let mut sum = 0.0;
+                            let mut sum: f64 = 0.0;
                             for k in 0..mc_self.cols {
                                 sum += mc_self[(cell_row, k)] * mc_rhs[(k, cell_col)];
                             }
 
-                            mc_result.set(cell_row, cell_col, sum).unwrap();
 
-                            index += cpu_cores;
+                            // mc_result.set(cell_row, cell_col, sum).unwrap();
                         }
                     }
                 });
