@@ -1,7 +1,5 @@
 use std::{
-    ops,
-    sync::{Arc, Mutex},
-    thread,
+    cell::UnsafeCell, collections::HashMap, num::ParseIntError, ops, sync::{mpsc, Arc, Mutex}, thread
 };
 
 use crate::{cpu_info, matrix::Matrix};
@@ -106,22 +104,20 @@ impl ops::MulAssign<&Matrix> for Matrix {
             let arc_result = Arc::new(result.clone());
             let arc_self = Arc::new(self.clone());
             let arc_rhs = Arc::new(rhs.clone());
+            let unsafe_result = Arc::new(vec![0.0; self.rows * rhs.cols]);
 
             // println!("start:\n  self: row -> {}, col -> {}\n  rhs: row -> {}, col -> {}", self.rows, self.cols, rhs.rows, rhs.cols);
 
             let mut arc_results: Arc<Vec<Vec<f64>>> = Arc::new(Vec::new());
             let mut indexes: Vec<usize> = vec![];
+            let data_len = result.data.len() as f64;
 
-            let data_len = result.data.len();
-            let div_value = data_len / cpu_cores;
-            let mod_value = data_len % cpu_cores;
-
-            let mut c_results = Arc::clone(&arc_results);
             for i in 0..cpu_cores {
-                (c_results).push(Vec::new());
-                indexes.push(div_value * i + mod_value * i / cpu_cores);
+                indexes.push((data_len / (cpu_cores as f64) * i as f64).floor() as usize);
             }
-            indexes.push(data_len);
+            indexes.push(data_len as usize);
+
+            let (tx, rx) = mpsc::channel();
 
             let mut handles: Vec<thread::JoinHandle<()>> = vec![];
             for offset in 0..cpu_cores {
@@ -129,13 +125,14 @@ impl ops::MulAssign<&Matrix> for Matrix {
                 let mc_rhs = Arc::clone(&arc_rhs);
 
                 let mc_result = Arc::clone(&arc_result);
-                let 
 
                 let indexes_clone = indexes.clone();
+                let txc: mpsc::Sender<(usize, Vec<f64>)> = mpsc::Sender::clone(&tx);
                 let thread = thread::spawn({
                     move || {
-                        for index in indexes_clone[offset]..indexes_clone[offset+1] {
-                            let cell_row = index / mc_rhs.cols;
+                        let mut partial_result = vec![];
+                        for index in indexes_clone[offset]..indexes_clone[offset + 1] {
+                            let cell_row: usize = index / mc_rhs.cols;
                             let cell_col = index % mc_rhs.cols;
 
                             let mut sum: f64 = 0.0;
@@ -143,20 +140,27 @@ impl ops::MulAssign<&Matrix> for Matrix {
                                 sum += mc_self[(cell_row, k)] * mc_rhs[(k, cell_col)];
                             }
 
-
-                            // mc_result.set(cell_row, cell_col, sum).unwrap();
+                            partial_result.push(sum);
                         }
+                        txc.send((offset, partial_result)).unwrap();
                     }
                 });
 
                 handles.push(thread);
             }
 
-            // println!("handle value: {}", handles.len());
-
-            for handle in handles {
-                handle.join().unwrap();
+            let mut received_data: HashMap<usize, Vec<f64>> = HashMap::new();
+            let mut count = 0;
+            for received in rx {
+                count += 1;
+                println!("{}, {:?}", received.0, received.1);
+                received_data.insert(received.0, received.1);
+                if count >= cpu_cores {
+                    break;
+                }
             }
+
+            println!("{:?}", received_data);
 
             *self = result;
         } else {
