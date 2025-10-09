@@ -1,4 +1,4 @@
-use std::ops;
+use std::{ops, time};
 
 use crate::matrix::{self, Matrix};
 
@@ -98,6 +98,8 @@ impl ops::MulAssign<&Matrix> for Matrix {
     fn mul_assign(&mut self, rhs: &Matrix) {
         if self.cols == rhs.rows {
             let mut result = Matrix::new(self.rows, rhs.cols);
+
+            let start = time::Instant::now();
             for i in 0..self.rows {
                 for j in 0..rhs.cols {
                     let mut sum = 0.0;
@@ -107,28 +109,8 @@ impl ops::MulAssign<&Matrix> for Matrix {
                     result.set(i, j, sum).unwrap();
                 }
             }
-            *self = result;
-            // let cpu_cores = *cpu_info::LOGICAL_CORES;
-            // let arc_self = Arc::new(self.clone());
-            // let arc_rhs = Arc::new(rhs.clone());
-
-            let mut result_data = vec![0.0; self.rows * rhs.cols];
-
-            let start = time::Instant::now();
-            result_data.par_chunks_mut(rhs.cols).enumerate().for_each(
-                |(row_index, result_row_slice)| {
-                    for col_index in 0..rhs.cols {
-                        let mut sum = 0.0;
-                        for k in 0..self.cols {
-                            sum += self[(row_index, k)] * rhs[(k, col_index)];
-                        }
-                        result_row_slice[col_index] = sum;
-                    }
-                },
-            );
             println!("actual calc time: {:?}", start.elapsed());
-
-            *self = Matrix::new_from_vec(self.rows, rhs.cols, result_data).unwrap();
+            *self = result;
         } else {
             panic!("Matrices must have compatible dimensions for multiplication");
         }
