@@ -8,6 +8,7 @@ mod rand;
 mod ron_data;
 mod iris_normalization;
 mod cpu_info;
+mod matrix_mul_calc_speed;
 
 fn main() {
     iris_nn_process();
