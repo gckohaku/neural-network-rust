@@ -4,7 +4,7 @@ use std::{
     num::ParseIntError,
     ops,
     sync::{Arc, Mutex, mpsc},
-    thread,
+    thread, time,
 };
 
 use rayon::{
@@ -115,10 +115,9 @@ impl ops::MulAssign<&Matrix> for Matrix {
 
             let mut result_data = vec![0.0; self.rows * rhs.cols];
 
-            result_data
-                .par_chunks_mut(rhs.cols)
-                .enumerate()
-                .for_each(|(row_index, result_row_slice)| {
+            let start = time::Instant::now();
+            result_data.par_chunks_mut(rhs.cols).enumerate().for_each(
+                |(row_index, result_row_slice)| {
                     for col_index in 0..rhs.cols {
                         let mut sum = 0.0;
                         for k in 0..self.cols {
@@ -126,9 +125,11 @@ impl ops::MulAssign<&Matrix> for Matrix {
                         }
                         result_row_slice[col_index] = sum;
                     }
-                });
+                },
+            );
+            println!("actual calc time: {:?}", start.elapsed());
 
-                *self = Matrix::new_from_vec(self.rows, rhs.cols, result_data).unwrap();
+            *self = Matrix::new_from_vec(self.rows, rhs.cols, result_data).unwrap();
         } else {
             panic!("Matrices must have compatible dimensions for multiplication");
         }
