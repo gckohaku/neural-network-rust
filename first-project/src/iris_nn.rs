@@ -85,7 +85,7 @@ pub fn iris_nn_process() {
             nn.backward(&expects, 0.0007).unwrap();
         }
 
-        if (epoch + 1) % 1 == 0 {
+        if (epoch + 1) % 50 == 0 {
             println!(
                 "epoch {:6} error: {:13.10}",
                 epoch + 1,

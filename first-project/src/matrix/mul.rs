@@ -1,5 +1,15 @@
 use std::{
-    cell::UnsafeCell, collections::HashMap, num::ParseIntError, ops, sync::{mpsc, Arc, Mutex}, thread
+    cell::UnsafeCell,
+    collections::HashMap,
+    num::ParseIntError,
+    ops,
+    sync::{Arc, Mutex, mpsc},
+    thread,
+};
+
+use rayon::{
+    iter::{IndexedParallelIterator, ParallelIterator},
+    slice::ParallelSliceMut,
 };
 
 use crate::{cpu_info, matrix::Matrix};
@@ -99,70 +109,26 @@ impl ops::MulAssign<Matrix> for Matrix {
 impl ops::MulAssign<&Matrix> for Matrix {
     fn mul_assign(&mut self, rhs: &Matrix) {
         if self.cols == rhs.rows {
-            let cpu_cores = *cpu_info::LOGICAL_CORES;
-            let result = Matrix::new(self.rows, rhs.cols);
-            let arc_result = Arc::new(result.clone());
-            let arc_self = Arc::new(self.clone());
-            let arc_rhs = Arc::new(rhs.clone());
-            let unsafe_result = Arc::new(vec![0.0; self.rows * rhs.cols]);
+            // let cpu_cores = *cpu_info::LOGICAL_CORES;
+            // let arc_self = Arc::new(self.clone());
+            // let arc_rhs = Arc::new(rhs.clone());
 
-            // println!("start:\n  self: row -> {}, col -> {}\n  rhs: row -> {}, col -> {}", self.rows, self.cols, rhs.rows, rhs.cols);
+            let mut result_data = vec![0.0; self.rows * rhs.cols];
 
-            let mut arc_results: Arc<Vec<Vec<f64>>> = Arc::new(Vec::new());
-            let mut indexes: Vec<usize> = vec![];
-            let data_len = result.data.len() as f64;
-
-            for i in 0..cpu_cores {
-                indexes.push((data_len / (cpu_cores as f64) * i as f64).floor() as usize);
-            }
-            indexes.push(data_len as usize);
-
-            let (tx, rx) = mpsc::channel();
-
-            let mut handles: Vec<thread::JoinHandle<()>> = vec![];
-            for offset in 0..cpu_cores {
-                let mc_self = Arc::clone(&arc_self);
-                let mc_rhs = Arc::clone(&arc_rhs);
-
-                let mc_result = Arc::clone(&arc_result);
-
-                let indexes_clone = indexes.clone();
-                let txc: mpsc::Sender<(usize, Vec<f64>)> = mpsc::Sender::clone(&tx);
-                let thread = thread::spawn({
-                    move || {
-                        let mut partial_result = vec![];
-                        for index in indexes_clone[offset]..indexes_clone[offset + 1] {
-                            let cell_row: usize = index / mc_rhs.cols;
-                            let cell_col = index % mc_rhs.cols;
-
-                            let mut sum: f64 = 0.0;
-                            for k in 0..mc_self.cols {
-                                sum += mc_self[(cell_row, k)] * mc_rhs[(k, cell_col)];
-                            }
-
-                            partial_result.push(sum);
+            result_data
+                .par_chunks_mut(rhs.cols)
+                .enumerate()
+                .for_each(|(row_index, result_row_slice)| {
+                    for col_index in 0..rhs.cols {
+                        let mut sum = 0.0;
+                        for k in 0..self.cols {
+                            sum += self[(row_index, k)] * rhs[(k, col_index)];
                         }
-                        txc.send((offset, partial_result)).unwrap();
+                        result_row_slice[col_index] = sum;
                     }
                 });
 
-                handles.push(thread);
-            }
-
-            let mut received_data: HashMap<usize, Vec<f64>> = HashMap::new();
-            let mut count = 0;
-            for received in rx {
-                count += 1;
-                println!("{}, {:?}", received.0, received.1);
-                received_data.insert(received.0, received.1);
-                if count >= cpu_cores {
-                    break;
-                }
-            }
-
-            println!("{:?}", received_data);
-
-            *self = result;
+                *self = Matrix::new_from_vec(self.rows, rhs.cols, result_data).unwrap();
         } else {
             panic!("Matrices must have compatible dimensions for multiplication");
         }
