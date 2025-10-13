@@ -99,12 +99,11 @@ impl ops::MulAssign<&Matrix> for Matrix {
         if self.cols == rhs.rows {
             let mut result = Matrix::new(self.rows, rhs.cols);
             for i in 0..self.rows {
-                for j in 0..rhs.cols {
-                    let mut sum = 0.0;
-                    for k in 0..self.cols {
-                        sum += self.get(i, k).unwrap() * rhs.get(k, j).unwrap();
+                for k in 0..self.cols {
+                    let self_ik = self[(i, k)];
+                    for j in 0..rhs.cols {
+                        result[(i, j)] += self_ik * rhs[(k, j)];
                     }
-                    result.set(i, j, sum).unwrap();
                 }
             }
             *self = result;
