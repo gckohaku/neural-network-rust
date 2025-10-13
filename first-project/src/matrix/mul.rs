@@ -101,19 +101,8 @@ impl ops::MulAssign<&Matrix> for Matrix {
             for i in 0..self.rows {
                 for k in 0..self.cols {
                     let self_ik = self[(i, k)];
-                    let limit = rhs.cols - (rhs.cols % 4);
-                    let mut j = 0;
-                    while j < limit {
+                    for j in 0..rhs.cols {
                         result[(i, j)] += self_ik * rhs[(k, j)];
-                        result[(i, j + 1)] += self_ik * rhs[(k, j + 1)];
-                        result[(i, j + 2)] += self_ik * rhs[(k, j + 2)];
-                        result[(i, j + 3)] += self_ik * rhs[(k, j + 3)];
-
-                        j += 4;
-                    }
-                    while j < rhs.cols {
-                        result[(i, j)] += self_ik * rhs[(k, j)];
-                        j += 1;
                     }
                 }
             }
