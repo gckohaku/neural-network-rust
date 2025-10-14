@@ -113,23 +113,35 @@ impl ops::MulAssign<&Matrix> for Matrix {
             // let arc_self = Arc::new(self.clone());
             // let arc_rhs = Arc::new(rhs.clone());
 
-            let mut result_data = vec![0.0; self.rows * rhs.cols];
+            let mut result = Matrix::new(self.rows, rhs.cols);
+
+            let block_size = 4;
 
             let start = time::Instant::now();
-            result_data.par_chunks_mut(rhs.cols).enumerate().for_each(
-                |(row_index, result_row_slice)| {
-                    for col_index in 0..rhs.cols {
-                        let mut sum = 0.0;
+            result
+                .data
+                .par_chunks_mut(rhs.cols * block_size)
+                .enumerate()
+                .for_each(|(chunk_index, result_block_slice)| {
+                    let start_row_index = chunk_index * block_size;
+
+                    for row_offset in 0..block_size {
+                        let row_index = start_row_index + row_offset;
+                        let result_row_slice = &mut result_block_slice
+                            [(row_offset * rhs.cols)..((row_offset + 1) * rhs.cols)];
+
                         for k in 0..self.cols {
-                            sum += self[(row_index, k)] * rhs[(k, col_index)];
+                            let self_ik = self.data[row_index * self.cols + k];
+                            for col_index in 0..rhs.cols {
+                                result_row_slice[col_index] +=
+                                    self_ik * rhs.data[k * rhs.cols + col_index];
+                            }
                         }
-                        result_row_slice[col_index] = sum;
                     }
-                },
-            );
+                });
             println!("actual calc time: {:?}", start.elapsed());
 
-            *self = Matrix::new_from_vec(self.rows, rhs.cols, result_data).unwrap();
+            *self = result;
         } else {
             panic!("Matrices must have compatible dimensions for multiplication");
         }
