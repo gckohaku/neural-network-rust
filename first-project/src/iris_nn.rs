@@ -97,11 +97,7 @@ pub fn iris_nn_process() {
 
     println!("epochs process duration: {:?}sec.", epochs_now.elapsed().as_secs_f64());
 
-    let export_now = time::Instant::now();
-
-    let _ = nn.export_ron();
-
-    println!("export process duration: {:?}.", export_now.elapsed());
+    // nn.export_ron();
 }
 
 fn generate_shuffle_array(value: usize, r: &mut Rand) -> Vec<usize> {
