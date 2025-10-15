@@ -1,1 +1,1 @@
-const MATRIX_MULTI_BLOCK_SIZE: usize = 32;
+pub const MATRIX_MULTI_BLOCK_SIZE: usize = 44;
