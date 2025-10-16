@@ -265,6 +265,10 @@ impl NeuralNetwork {
         self.error
     }
 
+    pub fn set_error(& mut self, error: f64) {
+        self.error = error;
+    }
+
     pub fn get_output_nodes(&self) -> &Matrix {
         self.nodes_after_activation.last().unwrap()
     }

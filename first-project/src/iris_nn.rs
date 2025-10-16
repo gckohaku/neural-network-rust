@@ -1,9 +1,26 @@
 use std::{arch::x86_64::_mm_sm4key4_epi32, collections::HashMap, time};
 
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+
 use crate::{
     iris_normalization::iris_normalization, matrix::Matrix, neural_network::*,
     output_activation_type::OutputActivationType, rand::Rand,
 };
+
+struct SampleData {
+    inputs: Vec<f64>,
+    expects: Vec<f64>,
+}
+
+impl SampleData {
+    #[inline]
+    fn new() -> SampleData {
+        SampleData {
+            inputs: vec![],
+            expects: vec![],
+        }
+    }
+}
 
 pub fn iris_nn_process() {
     let normalization_data = iris_normalization(&irisdata::IRIS_DATA);
@@ -42,10 +59,12 @@ pub fn iris_nn_process() {
                 batch.push(&normalization_data[*index]);
             }
 
-            let mut batch_data: Vec<f64> = Vec::new();
-            let mut expect_data: Vec<f64> = Vec::new();
+            let mut mini_batch = Vec::<SampleData>::new();
 
             for data in batch {
+                let mut batch_data: Vec<f64> = Vec::new();
+                let mut expect_data: Vec<f64> = Vec::new();
+
                 batch_data.push(data.sepal_length as f64);
                 batch_data.push(data.sepal_width as f64);
                 batch_data.push(data.petal_length as f64);
@@ -66,22 +85,28 @@ pub fn iris_nn_process() {
                 } else {
                     0.0
                 });
+
+                mini_batch.push(SampleData { inputs: batch_data, expects: expect_data });
             }
 
             let input_node_value = nn.get_input_node_value();
             let output_node_value = nn.get_output_node_value();
 
-            let inputs =
-                Matrix::new_from_vec(mini_batch_sample_size, input_node_value, batch_data).unwrap();
-            let expects =
-                Matrix::new_from_vec(mini_batch_sample_size, output_node_value, expect_data)
-                    .unwrap();
+            // let inputs =
+            //     Matrix::new_from_vec(mini_batch_sample_size, input_node_value, batch_data).unwrap();
+            // let expects =
+            //     Matrix::new_from_vec(mini_batch_sample_size, output_node_value, expect_data)
+            //         .unwrap();
 
             // println!("{:7.2}", &expects);
 
-            nn.forward(&inputs, &expects).unwrap();
-            epoch_error += nn.get_error();
-            nn.backward(&expects, 0.0007).unwrap();
+            let error_sum = mini_batch.par_iter().map(|sample| {
+                nn.forward(&Matrix::new_from_vec(1, output_node_value, sample.inputs)?, &Matrix::new_from_vec(1, output_node_value, sample.expects)?)
+            });
+
+            // nn.forward(&inputs, &expects).unwrap();
+            // epoch_error += nn.get_error();
+            // nn.backward(&expects, 0.0007).unwrap();
         }
 
         if (epoch + 1) % 500 == 0 {
@@ -94,7 +119,10 @@ pub fn iris_nn_process() {
         }
     }
 
-    println!("epochs process duration: {:?}sec.", epochs_now.elapsed().as_secs_f64());
+    println!(
+        "epochs process duration: {:?}sec.",
+        epochs_now.elapsed().as_secs_f64()
+    );
 
     // nn.export_ron();
 }
