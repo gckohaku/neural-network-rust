@@ -1,4 +1,4 @@
-use std::{arch::x86_64::_mm_sm4key4_epi32, collections::HashMap, time};
+use std::{arch::x86_64::_mm_sm4key4_epi32, collections::HashMap, ops::Add, sync::Arc, time};
 
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -7,6 +7,7 @@ use crate::{
     output_activation_type::OutputActivationType, rand::Rand,
 };
 
+#[derive(Clone)]
 struct SampleData {
     inputs: Vec<f64>,
     expects: Vec<f64>,
@@ -30,7 +31,8 @@ pub fn iris_nn_process() {
     let mini_batch_sample_size = 10;
 
     // iris dataset 用ニューラルネットワーク
-    let mut nn = NeuralNetwork::new(vec![4, 12, 24, 36, 24, 12, 3], mini_batch_sample_size);
+    let mut nn: NeuralNetwork =
+        NeuralNetwork::new(vec![4, 12, 24, 36, 24, 12, 3], mini_batch_sample_size);
     nn.set_activations(&mut vec![relu, relu, relu, relu, relu, relu]);
     nn.set_differential_activation(&mut vec![
         differential_relu,
@@ -44,6 +46,11 @@ pub fn iris_nn_process() {
 
     let epoch_value = 50000;
     let mut r = Rand::new();
+
+    let input_node_value = nn.get_input_node_value();
+    let output_node_value = nn.get_output_node_value();
+
+    let arc_nn = Arc::new(&nn);
 
     // 現在の時刻
     let epochs_now = time::Instant::now();
@@ -86,11 +93,11 @@ pub fn iris_nn_process() {
                     0.0
                 });
 
-                mini_batch.push(SampleData { inputs: batch_data, expects: expect_data });
+                mini_batch.push(SampleData {
+                    inputs: batch_data,
+                    expects: expect_data,
+                });
             }
-
-            let input_node_value = nn.get_input_node_value();
-            let output_node_value = nn.get_output_node_value();
 
             // let inputs =
             //     Matrix::new_from_vec(mini_batch_sample_size, input_node_value, batch_data).unwrap();
@@ -101,7 +108,14 @@ pub fn iris_nn_process() {
             // println!("{:7.2}", &expects);
 
             let error_sum = mini_batch.par_iter().map(|sample| {
-                nn.forward(&Matrix::new_from_vec(1, output_node_value, sample.inputs)?, &Matrix::new_from_vec(1, output_node_value, sample.expects)?)
+                let mut c_nn = arc_nn.clone();
+                c_nn.forward(
+                    &Matrix::new_from_vec(1, output_node_value, sample.inputs.to_vec()).unwrap(),
+                    &Matrix::new_from_vec(1, output_node_value, sample.expects.to_vec()).unwrap(),
+                ).unwrap();
+                c_nn.get_error()
+            }).reduce(|| 0.0, |grad1, grad2|{
+                grad1.add(grad2)
             });
 
             // nn.forward(&inputs, &expects).unwrap();
