@@ -31,8 +31,8 @@ pub fn iris_nn_process() {
     let mini_batch_sample_size = 10;
 
     // iris dataset 用ニューラルネットワーク
-    let mut nn: NeuralNetwork =
-        NeuralNetwork::new(vec![4, 12, 24, 36, 24, 12, 3], mini_batch_sample_size);
+    let mut nn: NeuralNetworkST =
+        NeuralNetworkST::new(vec![4, 12, 24, 36, 24, 12, 3], mini_batch_sample_size);
     nn.set_activations(&mut vec![relu, relu, relu, relu, relu, relu]);
     nn.set_differential_activation(&mut vec![
         differential_relu,
@@ -107,16 +107,16 @@ pub fn iris_nn_process() {
 
             // println!("{:7.2}", &expects);
 
-            let error_sum = mini_batch.par_iter().map(|sample| {
-                let mut c_nn = arc_nn.clone();
-                c_nn.forward(
-                    &Matrix::new_from_vec(1, output_node_value, sample.inputs.to_vec()).unwrap(),
-                    &Matrix::new_from_vec(1, output_node_value, sample.expects.to_vec()).unwrap(),
-                ).unwrap();
-                c_nn.get_error()
-            }).reduce(|| 0.0, |grad1, grad2|{
-                grad1.add(grad2)
-            });
+            // let error_sum = mini_batch.par_iter().map(|sample| {
+            //     let mut c_nn = arc_nn.clone();
+            //     c_nn.forward(
+            //         &Matrix::new_from_vec(1, output_node_value, sample.inputs.to_vec()).unwrap(),
+            //         &Matrix::new_from_vec(1, output_node_value, sample.expects.to_vec()).unwrap(),
+            //     ).unwrap();
+            //     c_nn.get_error()
+            // }).reduce(|| 0.0, |grad1, grad2|{
+            //     grad1.add(grad2)
+            // });
 
             // nn.forward(&inputs, &expects).unwrap();
             // epoch_error += nn.get_error();

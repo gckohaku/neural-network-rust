@@ -3,14 +3,11 @@ use std::{fmt::Display, fs::File, io::{self, BufRead, BufReader, Write}, ops::Ad
 use ron::ser::PrettyConfig;
 
 use crate::{
-    matrix::Matrix,
-    output_activation_type::OutputActivationType,
-    rand::Rand,
-    ron_data::{LayerInfo, RonNNData},
+    matrix::Matrix, neural_network_base::NeuralNetwork, output_activation_type::OutputActivationType, rand::Rand, ron_data::{LayerInfo, RonNNData}
 };
 
 #[derive(Debug, Clone)]
-pub struct NeuralNetwork {
+pub struct NeuralNetworkST {
     nodes: Vec<Matrix>,
     nodes_after_activation: Vec<Matrix>,
     weights: Vec<Matrix>,
@@ -50,7 +47,7 @@ pub fn softmax(z: &mut Matrix) {
 
 pub fn cross_entropy() {}
 
-impl NeuralNetwork {
+impl NeuralNetworkST {
     pub fn new(nodes_values: Vec<usize>, sample_value: usize) -> Self {
         let mut nodes = Vec::new();
         let mut nodes_after_activation = Vec::new();
@@ -303,7 +300,13 @@ impl NeuralNetwork {
     }
 }
 
-impl Display for NeuralNetwork {
+impl NeuralNetwork for NeuralNetworkST {
+    fn new(nodes_values: Vec<usize>, sample_value: usize) -> Self {
+        
+    }
+}
+
+impl Display for NeuralNetworkST {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let width = f.width().unwrap_or(10);
         let precision = f.precision().unwrap_or(0);
