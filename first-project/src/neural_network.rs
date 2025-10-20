@@ -3,19 +3,27 @@ use std::{fmt::Display, fs::File, io::{self, BufRead, BufReader, Write}, ops::Ad
 use ron::ser::PrettyConfig;
 
 use crate::{
-    matrix::Matrix, neural_network_base::NeuralNetwork, output_activation_type::OutputActivationType, rand::Rand, ron_data::{LayerInfo, RonNNData}
+    matrix::Matrix, neural_network_base::{self, Gradients, NeuralNetwork}, output_activation_type::OutputActivationType, rand::Rand, ron_data::{LayerInfo, RonNNData}
 };
+
+pub struct Scratchpad {
+    pub layer_inputs: Vec<Matrix>,
+    pub layer_outputs: Vec<Matrix>,
+    pub local_gradients: Gradients,
+}
+
+impl Scratchpad {
+    pub fn new_for_network(network_shape: &NeuralNetworkST) -> Self {
+        
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct NeuralNetworkST {
-    nodes: Vec<Matrix>,
-    nodes_after_activation: Vec<Matrix>,
     weights: Vec<Matrix>,
     biases: Vec<Matrix>,
     activations: Vec<fn(&f64) -> f64>,
     differential_activations: Vec<fn(&f64) -> f64>,
-    error: f64,
-    deltas: Vec<Matrix>,
     output_activation_type: OutputActivationType,
 }
 
@@ -45,27 +53,19 @@ pub fn softmax(z: &mut Matrix) {
     }
 }
 
-pub fn cross_entropy() {}
+impl NeuralNetwork for NeuralNetworkST {
+    type Workspace = Scratchpad;
 
-impl NeuralNetworkST {
-    pub fn new(nodes_values: Vec<usize>, sample_value: usize) -> Self {
-        let mut nodes = Vec::new();
-        let mut nodes_after_activation = Vec::new();
+    fn new(nodes_values: Vec<usize>, sample_value: usize) -> Self {
         let mut weights = Vec::new();
         let mut biases = Vec::new();
         let activations: Vec<fn(&f64) -> f64> = Vec::new();
         let differential_activations: Vec<fn(&f64) -> f64> = Vec::new();
-        let error = 0.0;
-        let mut deltas = Vec::new();
         let output_activation_type = OutputActivationType::Default;
 
         let mut r = Rand::new();
 
         for i in 0..nodes_values.len() {
-            // ノード行列のサイズは サンプル数 x 現在の層のノードの数
-            nodes.push(Matrix::new_and_fill(sample_value, nodes_values[i], 0.0));
-            // 活性化関数適用後の行列のサイズは現在の層のノードのサイズと同じ
-            nodes_after_activation.push(Matrix::new_and_fill(sample_value, nodes_values[i], 0.0));
 
             if i > 0 {
                 // 重み行列のサイズは 直前の層のノードの数 x 現在の層のノードの数
@@ -85,24 +85,28 @@ impl NeuralNetworkST {
                 weights.push(layer_weights);
                 // バイアス行列のサイズは 1 x 現在の層のノードの数
                 biases.push(Matrix::new_and_fill(1, nodes_values[i], 0.0));
-                // デルタ行列のサイズも現在の層のノードのサイズと同じ
-                deltas.push(Matrix::new_and_fill(sample_value, nodes_values[i], 0.0));
             }
         }
 
         Self {
-            nodes,
-            nodes_after_activation,
             weights,
             biases,
             activations,
             differential_activations,
-            error,
-            deltas,
             output_activation_type,
         }
     }
 
+    fn forward_and_backward(&self, inputs: &Matrix, expects: &Matrix, workspace: &mut Self::Workspace) -> Result<neural_network_base::Gradients, String> {
+        
+    }
+    
+    fn update(&mut self, workspace: &mut Self::Workspace) {
+        todo!()
+    }
+}
+
+impl NeuralNetworkST {
     pub fn set_activations(&mut self, activations: &mut Vec<fn(&f64) -> f64>) {
         self.activations.clear();
         self.activations.append(activations);
@@ -115,15 +119,6 @@ impl NeuralNetworkST {
 
     pub fn set_output_activation_type(&mut self, activation_type: OutputActivationType) {
         self.output_activation_type = activation_type;
-    }
-
-    pub fn view_status(&self) {
-        println!("Neural Network Status:");
-        println!("Nodes: {:?}", self.nodes);
-        println!("After Activation: {:?}", self.nodes_after_activation);
-        println!("Weights: {:?}", self.weights);
-        println!("Biases: {:?}", self.biases);
-        println!("Deltas: {:?}", self.deltas);
     }
 
     // NN の順伝搬。
