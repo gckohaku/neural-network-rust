@@ -2,7 +2,7 @@ use crate::iris_nn::{calc_average_and_variance, calc_kurtosis, calc_skewness, ir
 
 mod iris_nn;
 mod matrix;
-mod neural_network;
+mod fully_connected_network;
 mod output_activation_type;
 mod rand;
 mod ron_data;

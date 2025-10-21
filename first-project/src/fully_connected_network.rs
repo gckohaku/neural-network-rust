@@ -4,14 +4,14 @@ use ron::ser::PrettyConfig;
 
 use crate::{
     matrix::Matrix,
-    neural_network_base::{self, Gradients, NeuralNetwork, NeuralNetworkWorkspace},
+    neural_network_base::{Gradients, NetworkWorkspace, NeuralNetwork},
     output_activation_type::OutputActivationType,
     rand::Rand,
     ron_data::{LayerInfo, RonNNData},
 };
 
 #[derive(Debug, Clone)]
-pub struct NeuralNetworkST {
+pub struct FullyConnectedNetwork {
     weights: Vec<Matrix>,
     biases: Vec<Matrix>,
     activations: Vec<fn(&f64) -> f64>,
@@ -19,35 +19,7 @@ pub struct NeuralNetworkST {
     output_activation_type: OutputActivationType,
 }
 
-pub fn relu(x: &f64) -> f64 {
-    x.max(0.0)
-}
-
-pub fn differential_relu(x: &f64) -> f64 {
-    if *x > 0.0 { 1.0 } else { 0.0 }
-}
-
-pub fn leaky_relu(x: &f64) -> f64 {
-    if *x > 0.0 { *x } else { 0.01 * *x }
-}
-
-pub fn differential_leaky_relu(x: &f64) -> f64 {
-    if *x > 0.0 { 1.0 } else { 0.01 }
-}
-
-pub fn softmax(z: &mut Matrix) {
-    let nodes_exp_sum: f64 = z.data.iter().map(|x| x.exp()).sum();
-    for i in 0..z.rows {
-        for j in 0..z.cols {
-            let before_normalize = z.get(i, j).unwrap();
-            z.set(i, j, before_normalize.exp() / nodes_exp_sum).unwrap();
-        }
-    }
-}
-
-impl NeuralNetwork for NeuralNetworkST {
-    type Workspace = NeuralNetworkWorkspace;
-
+impl NeuralNetwork for FullyConnectedNetwork {
     fn new(nodes_values: Vec<usize>, sample_value: usize) -> Self {
         let mut weights = Vec::new();
         let mut biases = Vec::new();
@@ -92,58 +64,95 @@ impl NeuralNetwork for NeuralNetworkST {
         &self,
         inputs: &Matrix,
         expects: &Matrix,
-        workspace: &mut Self::Workspace,
-    ) -> Gradients {
+        workspace: &mut NetworkWorkspace,
+    ) -> Result<Gradients, String> {
         let sample_size = inputs.rows;
+        let output_index = self.weights.len() - 1;
 
+        // まず、順伝播を行う
         for i in 0..self.weights.len() {
-            self.nodes[i] = (&self.nodes_after_activation[i - 1] * &self.weights[i - 1]
-                + &self.biases[i - 1])
-                .unwrap();
+            workspace.layer_inputs[i] =
+                (&workspace.layer_outputs[i] * &self.weights[i] + &self.biases[i]).unwrap();
 
             // 出力層かつ目的関数を別途指定している場合、設定に応じて処理が分かれる
-            if i >= self.weights.len()
+            if i >= self.weights.len() - 1
                 && self.output_activation_type != OutputActivationType::Default
             {
                 // softmax 関数と交差エントロピー誤差を利用する場合
                 if self.output_activation_type == OutputActivationType::SoftmaxAndCrossEntropy {
-                    // オーバーフロー対策として、node に入れる値は max(weighted_sum) で減算する
+                    // オーバーフロー対策として、node に入れる値は max(ノードの入力値) で減算する
                     // Vec<f64> の最大値はこうすることで取得できるらしい
-                    let max_output_value: f64 =
-                        self.nodes[i].data.iter().fold(0.0 / 0.0, |m, v| v.max(m));
-                    // 減算
-                    let processed_output_vec: Vec<f64> = self.nodes[i]
+                    let max_input_value: f64 = workspace.layer_inputs[i]
                         .data
                         .iter()
-                        .map(|x| (x - max_output_value).exp())
+                        .fold(0.0 / 0.0, |m, v| v.max(m));
+                    // 減算
+                    let processed_input_vec: Vec<f64> = workspace.layer_inputs[i]
+                        .data
+                        .iter()
+                        .map(|x| (x - max_input_value).exp())
                         .collect();
 
-                    let mut exp_output =
-                        Matrix::new_from_vec(expects.rows, expects.cols, processed_output_vec)
+                    let mut exp_input =
+                        Matrix::new_from_vec(expects.rows, expects.cols, processed_input_vec)
                             .unwrap();
 
                     // 総和行列を作成する　ブロードキャストできるようにしているので、各サンプルの要素は一つでいい
                     let mut node_sums: Vec<f64> = Vec::new();
                     for s in 0..sample_size {
-                        node_sums.push(exp_output.sum_row_elements(s));
+                        node_sums.push(exp_input.sum_row_elements(s));
                     }
                     let mut sum_matrix = Matrix::new_from_vec(sample_size, 1, node_sums).unwrap();
 
-                    let softmax_result = exp_output
+                    let softmax_result = exp_input
                         .hadamard(&sum_matrix.hadamard_function(|x| 1.0 / (x + 1e-10)))
                         .unwrap();
 
-                    self.nodes_after_activation[i] = softmax_result;
+                    workspace.layer_outputs[i] = softmax_result;
                 }
             } else {
-                self.nodes_after_activation[i] =
-                    self.nodes[i].hadamard_function(self.activations[i - 1]);
+                workspace.layer_outputs[i + 1] =
+                    workspace.layer_inputs[i].hadamard_function(self.activations[i]);
             }
         }
-        Gradients::new(network_shape)
+
+        // 誤差を求める　求めた後にサンプル数で除算
+        let mut output_node = workspace.layer_outputs[output_index + 1].clone();
+
+        // softmax 関数と交差エントロピー誤差を利用する場合
+        if self.output_activation_type == OutputActivationType::SoftmaxAndCrossEntropy {
+            let ln_output = output_node.hadamard_function(|x| (x + 1e-10).ln());
+
+            workspace.error = expects.hadamard(&ln_output).unwrap().sum_all_elements();
+        }
+
+        // 次に逆伝播を行い、勾配を求める
+        // 出力層のデルタ
+        workspace.layer_deltas[output_index] =
+            (&workspace.layer_outputs[output_index + 1] - expects).unwrap();
+
+        // 隠れ層のデルタ
+        for i in (0..output_index).rev() {
+            let delta = &workspace.layer_deltas[i + 1];
+            let w = self.weights[i + 1].transpose();
+            let u = &mut workspace.layer_inputs[i];
+            let da = self.differential_activations[i];
+            let da_u = u.hadamard_function(da);
+
+            workspace.layer_deltas[i] = (delta * &w).unwrap().hadamard(&da_u).unwrap();
+        }
+
+        // 求めたデルタを用いて勾配を計算する (ここでは学習率は考慮しない)
+        for i in (0..=output_index).rev() {
+            workspace.local_gradients.weights[i] =
+                (&workspace.layer_outputs[i].transpose() * &workspace.layer_deltas[i]).unwrap();
+            workspace.local_gradients.biases[i] = workspace.layer_deltas[i].mean_cols();
+        }
+
+        Ok(workspace.local_gradients.clone())
     }
 
-    fn update_weights(&mut self, workspace: &mut Self::Workspace) {
+    fn update_weights(&mut self, workspace: &mut NetworkWorkspace) {
         todo!()
     }
 
@@ -156,7 +165,7 @@ impl NeuralNetwork for NeuralNetworkST {
     }
 }
 
-impl NeuralNetworkST {
+impl FullyConnectedNetwork {
     pub fn set_activations(&mut self, activations: &mut Vec<fn(&f64) -> f64>) {
         self.activations.clear();
         self.activations.append(activations);
@@ -348,11 +357,11 @@ impl NeuralNetworkST {
     }
 }
 
-impl NeuralNetwork for NeuralNetworkST {
+impl NeuralNetwork for FullyConnectedNetwork {
     fn new(nodes_values: Vec<usize>, sample_value: usize) -> Self {}
 }
 
-impl Display for NeuralNetworkST {
+impl Display for FullyConnectedNetwork {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let width = f.width().unwrap_or(10);
         let precision = f.precision().unwrap_or(0);

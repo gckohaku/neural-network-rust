@@ -3,8 +3,7 @@ use std::{arch::x86_64::_mm_sm4key4_epi32, collections::HashMap, ops::Add, sync:
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
-    iris_normalization::iris_normalization, matrix::Matrix, neural_network::*,
-    output_activation_type::OutputActivationType, rand::Rand,
+    fully_connected_network::*, iris_normalization::iris_normalization, matrix::Matrix, neural_network_base::NeuralNetwork, output_activation_type::OutputActivationType, rand::Rand
 };
 
 #[derive(Clone)]
@@ -31,16 +30,16 @@ pub fn iris_nn_process() {
     let mini_batch_sample_size = 10;
 
     // iris dataset 用ニューラルネットワーク
-    let mut nn: NeuralNetworkST =
-        NeuralNetworkST::new(vec![4, 12, 24, 36, 24, 12, 3], mini_batch_sample_size);
-    nn.set_activations(&mut vec![relu, relu, relu, relu, relu, relu]);
+    let mut nn: FullyConnectedNetwork =
+        FullyConnectedNetwork::new(vec![4, 12, 24, 36, 24, 12, 3], mini_batch_sample_size);
+    nn.set_activations(&mut vec![NeuralNetwork::relu, NeuralNetwork::relu, NeuralNetwork::relu, NeuralNetwork::relu, NeuralNetwork::relu, NeuralNetwork::relu]);
     nn.set_differential_activation(&mut vec![
-        differential_relu,
-        differential_relu,
-        differential_relu,
-        differential_relu,
-        differential_relu,
-        differential_relu,
+        NeuralNetwork::differential_relu,
+        NeuralNetwork::differential_relu,
+        NeuralNetwork::differential_relu,
+        NeuralNetwork::differential_relu,
+        NeuralNetwork::differential_relu,
+        NeuralNetwork::differential_relu,
     ]);
     nn.set_output_activation_type(OutputActivationType::SoftmaxAndCrossEntropy);
 

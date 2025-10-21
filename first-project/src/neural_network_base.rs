@@ -1,10 +1,12 @@
+use core::net;
 use std::ops;
 
-use crate::{matrix::Matrix, neural_network::NeuralNetworkST};
+use crate::{matrix::Matrix};
 
+#[derive(Clone)]
 pub struct Gradients {
-    weights: Vec<Matrix>,
-    biases: Vec<Matrix>,
+    pub weights: Vec<Matrix>,
+    pub biases: Vec<Matrix>,
 }
 
 impl Gradients {
@@ -36,26 +38,41 @@ impl ops::AddAssign<Gradients> for Gradients {
     }
 }
 
-pub struct NeuralNetworkWorkspace {
+/// ニューラルネットワークの学習に必要な中間データなどを格納する
+pub struct NetworkWorkspace {
     pub layer_inputs: Vec<Matrix>,
+    /// layer_outputs は入力層のデータも保持しているため、Vec の長さが 1 長い
     pub layer_outputs: Vec<Matrix>,
+    pub layer_deltas: Vec<Matrix>,
+    pub error: f64,
     pub local_gradients: Gradients,
 }
 
-impl NeuralNetworkWorkspace {
-    pub fn new_for_network(network_shape: &NeuralNetworkST) -> Self {
+impl NetworkWorkspace {
+    pub fn new_for_network(network_shape: &impl NeuralNetwork) -> Self {
         let layer_value = network_shape.get_layer_value();
 
         let mut layer_inputs = Vec::<Matrix>::new();
         let mut layer_outputs = Vec::<Matrix>::new();
+        let mut layer_deltas = Vec::<Matrix>::new();
 
-        for i in 0..layer_value {}
+        layer_outputs.push(Matrix::new(1, network_shape.get_weight_matrix(0).rows));
 
+        for i in 0..layer_value {
+            let mut current_node_value = network_shape.get_weight_matrix(0).cols;
+            layer_inputs.push(Matrix::new(1, current_node_value));
+            layer_outputs.push(Matrix::new(1, current_node_value));
+            layer_deltas.push(Matrix::new(1, current_node_value));
+        }
+
+        let error = 0.0;
         let local_gradients = Gradients::new(network_shape);
 
-        NeuralNetworkWorkspace {
+        NetworkWorkspace {
             layer_inputs: layer_inputs,
             layer_outputs: layer_outputs,
+            layer_deltas: layer_deltas,
+            error: error,
             local_gradients: local_gradients,
         }
     }
@@ -67,11 +84,12 @@ pub trait NeuralNetwork {
         &self,
         inputs: &Matrix,
         expects: &Matrix,
-        workspace: &mut Self::Workspace,
+        workspace: &mut NetworkWorkspace,
     ) -> Result<Gradients, String>;
-    fn update_weights(&mut self, workspace: &mut Self::Workspace);
+    fn update_weights(&mut self, workspace: &mut NetworkWorkspace);
     fn get_layer_value(&self) -> usize;
     fn get_weight_matrix(&self, index: usize) -> &Matrix;
+
     fn relu(x: &f64) -> f64 {
         x.max(0.0)
     }
@@ -97,7 +115,4 @@ pub trait NeuralNetwork {
             }
         }
     }
-
-    // 関連型
-    type Workspace;
 }
