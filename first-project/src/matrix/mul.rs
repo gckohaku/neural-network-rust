@@ -1,9 +1,8 @@
-use std::{ops, time};
+use std::ops::{self, MulAssign};
 
-use crate::{
-    constants,
-    matrix::{self, Matrix},
-};
+use crate::
+    matrix::Matrix
+;
 
 /* 実数との乗算 */
 // Matrix *= f64
@@ -81,12 +80,11 @@ impl ops::MulAssign<Matrix> for Matrix {
         if self.cols == rhs.rows {
             let mut result = Matrix::new(self.rows, rhs.cols);
             for i in 0..self.rows {
-                for j in 0..rhs.cols {
-                    let mut sum = 0.0;
-                    for k in 0..self.cols {
-                        sum += self.get(i, k).unwrap() * rhs.get(k, j).unwrap();
+                for k in 0..self.cols {
+                    let self_ik = self.data[i * self.cols + k];
+                    for j in 0..rhs.cols {
+                        result.data[i * result.cols + j] += self_ik * rhs.data[k * rhs.cols + j];
                     }
-                    result.set(i, j, sum).unwrap();
                 }
             }
             *self = result;
@@ -103,9 +101,9 @@ impl ops::MulAssign<&Matrix> for Matrix {
             let mut result = Matrix::new(self.rows, rhs.cols);
             for i in 0..self.rows {
                 for k in 0..self.cols {
-                    let self_ik = self[(i, k)];
+                    let self_ik = self.data[i * self.cols + k];
                     for j in 0..rhs.cols {
-                        result[(i, j)] += self_ik * rhs[(k, j)];
+                        result.data[i * result.cols + j] += self_ik * rhs.data[k * rhs.cols + j];
                     }
                 }
             }

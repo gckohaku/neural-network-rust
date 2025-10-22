@@ -5,7 +5,7 @@ mod sub;
 
 use std::{
     fmt::{Debug, Display},
-    ops, result, vec,
+    ops, vec,
 };
 
 #[derive(Clone, Debug)]

@@ -47,11 +47,13 @@ pub fn iris_nn_process() {
     ]);
     nn.set_output_activation_type(OutputActivationType::SoftmaxAndCrossEntropy);
 
-    let epoch_value = 50000;
+    let epoch_value = 10000;
     let mut r = Rand::new();
 
     // 現在の時刻
     let epochs_now = time::Instant::now();
+
+    let mut workspace = NetworkWorkspace::new_for_network(&nn, mini_batch_sample_size);
 
     for epoch in 0..epoch_value {
         let shuffle_index = generate_shuffle_array(normalization_data.len(), &mut r);
@@ -90,8 +92,6 @@ pub fn iris_nn_process() {
                 });
             }
 
-            println!("{:?}", expect_data);
-
             let input_node_value = nn.get_input_node_value();
             let output_node_value = nn.get_output_node_value();
 
@@ -107,9 +107,9 @@ pub fn iris_nn_process() {
             // epoch_error += nn.get_error();
             // nn.backward(&expects, 0.0007).unwrap();
 
-            let mut workspace = NetworkWorkspace::new_for_network(&nn, mini_batch_sample_size);
-            let gradients = nn.forward_and_backward(&inputs, &expects, &mut workspace).unwrap();
-            nn.update_weights(&gradients, 0.0007);
+            nn.forward_and_backward(&inputs, &expects, &mut workspace, 0.0007);
+            nn.update_weights(&mut workspace.next_weights, &mut workspace.next_biases);
+            epoch_error += workspace.error;
         }
 
         if (epoch + 1) % 500 == 0 {

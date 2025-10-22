@@ -65,11 +65,14 @@ impl NeuralNetwork for FullyConnectedNetwork {
         inputs: &Matrix,
         expects: &Matrix,
         workspace: &mut NetworkWorkspace,
-    ) -> Result<Gradients, String> {
+        eta: f64,
+    ) {
         let sample_size = inputs.rows;
         let output_index = self.weights.len() - 1;
 
         // まず、順伝播を行う
+        workspace.layer_inputs[0] = inputs.clone();
+
         for i in 0..self.weights.len() {
             workspace.layer_inputs[i] =
                 (&workspace.layer_outputs[i] * &self.weights[i] + &self.biases[i]).unwrap();
@@ -92,7 +95,6 @@ impl NeuralNetwork for FullyConnectedNetwork {
                         .iter()
                         .map(|x| (x - max_input_value).exp())
                         .collect();
-
 
                     let mut exp_input =
                         Matrix::new_from_vec(expects.rows, expects.cols, processed_input_vec)
@@ -123,11 +125,7 @@ impl NeuralNetwork for FullyConnectedNetwork {
         // softmax 関数と交差エントロピー誤差を利用する場合
         if self.output_activation_type == OutputActivationType::SoftmaxAndCrossEntropy {
             let ln_output = output_node.hadamard_function(|x| (x + 1e-10).ln());
-
-            println!("{}, {}", output_index, self.weights.len());
-            println!("{}, {}", expects.data.len(), ln_output.data.len());
-
-            workspace.error = expects.hadamard(&ln_output).unwrap().sum_all_elements();
+            workspace.error = -expects.hadamard(&ln_output).unwrap().sum_all_elements();
         }
 
         // 次に逆伝播を行い、勾配を求める
@@ -146,21 +144,30 @@ impl NeuralNetwork for FullyConnectedNetwork {
             workspace.layer_deltas[i] = (delta * &w).unwrap().hadamard(&da_u).unwrap();
         }
 
-        // 求めたデルタを用いて勾配を計算する (ここでは学習率は考慮しない)
+        // 求めたデルタを用いて勾配を計算する
         for i in (0..=output_index).rev() {
-            workspace.local_gradients.weights[i] =
-                (&workspace.layer_outputs[i].transpose() * &workspace.layer_deltas[i]).unwrap();
-            workspace.local_gradients.biases[i] = workspace.layer_deltas[i].mean_cols();
-        }
+            workspace.next_weights[i] = (&self.weights[i]
+                - &(eta
+                    * (&workspace.layer_outputs[i].transpose() * &workspace.layer_deltas[i])
+                        .unwrap()))
+                .unwrap();
+            workspace.next_biases[i] =
+                (&self.biases[i] - &(eta * workspace.layer_deltas[i].mean_cols())).unwrap();
 
-        Ok(workspace.local_gradients.clone())
+            // workspace.local_gradients.weights[i] =
+            //     (&workspace.layer_outputs[i].transpose() * &workspace.layer_deltas[i]).unwrap();
+            // workspace.local_gradients.biases[i] = workspace.layer_deltas[i].mean_cols();
+        }
     }
 
-    fn update_weights(&mut self, gradients: &Gradients, eta: f64) {
-        for index in 0..gradients.weights.len() {
-            self.weights[index] -= eta * &gradients.weights[index];
-            self.biases[index] -= eta * &gradients.biases[index];
-        }
+    fn update_weights(&mut self, next_weights: &mut Vec<Matrix>, next_biases: &mut Vec<Matrix>) {
+        // for index in 0..gradients.weights.len() {
+        //     self.weights[index] -= eta * &gradients.weights[index];
+        //     self.biases[index] -= eta * &gradients.biases[index];
+        // }
+
+        std::mem::swap(&mut self.weights, next_weights);
+        std::mem::swap(&mut self.biases, next_biases);
     }
 
     fn set_activations(&mut self, activations: &mut Vec<fn(&f64) -> f64>) {

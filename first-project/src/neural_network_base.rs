@@ -44,7 +44,10 @@ pub struct NetworkWorkspace {
     pub layer_outputs: Vec<Matrix>,
     pub layer_deltas: Vec<Matrix>,
     pub error: f64,
+    // ↓あとで消す
     pub local_gradients: Gradients,
+    pub next_weights: Vec<Matrix>,
+    pub next_biases: Vec<Matrix>,
 }
 
 impl NetworkWorkspace {
@@ -54,14 +57,22 @@ impl NetworkWorkspace {
         let mut layer_inputs = Vec::<Matrix>::new();
         let mut layer_outputs = Vec::<Matrix>::new();
         let mut layer_deltas = Vec::<Matrix>::new();
+        let mut next_weights = Vec::<Matrix>::new();
+        let mut next_biases = Vec::<Matrix>::new();
 
-        layer_outputs.push(Matrix::new(sample_value, network_shape.get_weight_matrix(0).rows));
+        layer_outputs.push(Matrix::new(
+            sample_value,
+            network_shape.get_weight_matrix(0).rows,
+        ));
 
         for i in 0..layer_value {
-            let mut current_node_value = network_shape.get_weight_matrix(0).cols;
+            let current_matrix = network_shape.get_weight_matrix(i);
+            let current_node_value = current_matrix.cols;
             layer_inputs.push(Matrix::new(sample_value, current_node_value));
             layer_outputs.push(Matrix::new(sample_value, current_node_value));
             layer_deltas.push(Matrix::new(sample_value, current_node_value));
+            next_weights.push(Matrix::new(current_matrix.rows, current_matrix.cols));
+            next_biases.push(Matrix::new(1, current_node_value));
         }
 
         let error = 0.0;
@@ -73,6 +84,8 @@ impl NetworkWorkspace {
             layer_deltas: layer_deltas,
             error: error,
             local_gradients: local_gradients,
+            next_weights: next_weights,
+            next_biases: next_biases,
         }
     }
 }
@@ -84,8 +97,9 @@ pub trait NeuralNetwork {
         inputs: &Matrix,
         expects: &Matrix,
         workspace: &mut NetworkWorkspace,
-    ) -> Result<Gradients, String>;
-    fn update_weights(&mut self, gradients: &Gradients, eta: f64);
+        eta: f64,
+    );
+    fn update_weights(&mut self, next_weights: &mut Vec<Matrix>, next_biases: &mut Vec<Matrix>);
     fn set_activations(&mut self, activations: &mut Vec<fn(&f64) -> f64>);
     fn set_differential_activation(&mut self, differentials: &mut Vec<fn(&f64) -> f64>);
     fn set_output_activation_type(&mut self, activation_type: OutputActivationType);
