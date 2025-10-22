@@ -93,6 +93,7 @@ impl NeuralNetwork for FullyConnectedNetwork {
                         .map(|x| (x - max_input_value).exp())
                         .collect();
 
+
                     let mut exp_input =
                         Matrix::new_from_vec(expects.rows, expects.cols, processed_input_vec)
                             .unwrap();
@@ -116,12 +117,15 @@ impl NeuralNetwork for FullyConnectedNetwork {
             }
         }
 
-        // 誤差を求める　求めた後にサンプル数で除算
+        // 誤差を求める
         let mut output_node = workspace.layer_outputs[output_index + 1].clone();
 
         // softmax 関数と交差エントロピー誤差を利用する場合
         if self.output_activation_type == OutputActivationType::SoftmaxAndCrossEntropy {
             let ln_output = output_node.hadamard_function(|x| (x + 1e-10).ln());
+
+            println!("{}, {}", output_index, self.weights.len());
+            println!("{}, {}", expects.data.len(), ln_output.data.len());
 
             workspace.error = expects.hadamard(&ln_output).unwrap().sum_all_elements();
         }
@@ -152,183 +156,48 @@ impl NeuralNetwork for FullyConnectedNetwork {
         Ok(workspace.local_gradients.clone())
     }
 
-    fn update_weights(&mut self, workspace: &mut NetworkWorkspace) {
-        todo!()
+    fn update_weights(&mut self, gradients: &Gradients, eta: f64) {
+        for index in 0..gradients.weights.len() {
+            self.weights[index] -= eta * &gradients.weights[index];
+            self.biases[index] -= eta * &gradients.biases[index];
+        }
+    }
+
+    fn set_activations(&mut self, activations: &mut Vec<fn(&f64) -> f64>) {
+        self.activations.clear();
+        self.activations.append(activations);
+    }
+
+    fn set_differential_activation(&mut self, differentials: &mut Vec<fn(&f64) -> f64>) {
+        self.differential_activations.clear();
+        self.differential_activations.append(differentials);
+    }
+
+    fn set_output_activation_type(&mut self, activation_type: OutputActivationType) {
+        self.output_activation_type = activation_type;
     }
 
     fn get_layer_value(&self) -> usize {
         self.weights.len()
     }
 
+    fn get_input_node_value(&self) -> usize {
+        self.weights.first().unwrap().rows
+    }
+
+    fn get_output_node_value(&self) -> usize {
+        self.weights.last().unwrap().cols
+    }
+
     fn get_weight_matrix(&self, index: usize) -> &Matrix {
         &self.weights[index]
     }
-}
 
-impl FullyConnectedNetwork {
-    pub fn set_activations(&mut self, activations: &mut Vec<fn(&f64) -> f64>) {
-        self.activations.clear();
-        self.activations.append(activations);
-    }
-
-    pub fn set_differential_activation(&mut self, differentials: &mut Vec<fn(&f64) -> f64>) {
-        self.differential_activations.clear();
-        self.differential_activations.append(differentials);
-    }
-
-    pub fn set_output_activation_type(&mut self, activation_type: OutputActivationType) {
-        self.output_activation_type = activation_type;
-    }
-
-    // NN の順伝搬。
-    pub fn forward(&mut self, inputs: &Matrix, expects: &Matrix) -> Result<(), String> {
-        if inputs.rows != self.nodes[0].rows || inputs.cols != self.nodes[0].cols {
-            return Err(
-                "Input dimensions do not match the first layer of the network.".to_string(),
-            );
-        }
-        let output_index = self.nodes.len() - 1;
-        if expects.rows != self.nodes[output_index].rows
-            || expects.cols != self.nodes[output_index].cols
-        {
-            return Err(
-                format!("Expect dimensions do not match the output layer of the network. expects: ({row}, {col}), output: ({o_row}, {o_col})", row = expects.rows, col = expects.cols, o_row = self.nodes[output_index].rows, o_col = self.nodes[output_index].cols).to_string(),
-            );
-        }
-
-        let sample_size = self.nodes[0].rows;
-        self.nodes[0] = inputs.clone();
-        self.nodes_after_activation[0] = inputs.clone();
-
-        for i in 1..self.nodes.len() {
-            self.nodes[i] = (&self.nodes_after_activation[i - 1] * &self.weights[i - 1]
-                + &self.biases[i - 1])
-                .unwrap();
-
-            // 出力層かつ目的関数を別途指定している場合、設定に応じて処理が分かれる
-            if i >= self.weights.len()
-                && self.output_activation_type != OutputActivationType::Default
-            {
-                // softmax 関数と交差エントロピー誤差を利用する場合
-                if self.output_activation_type == OutputActivationType::SoftmaxAndCrossEntropy {
-                    // オーバーフロー対策として、node に入れる値は max(weighted_sum) で減算する
-                    // Vec<f64> の最大値はこうすることで取得できるらしい
-                    let max_output_value: f64 =
-                        self.nodes[i].data.iter().fold(0.0 / 0.0, |m, v| v.max(m));
-                    // 減算
-                    let processed_output_vec: Vec<f64> = self.nodes[i]
-                        .data
-                        .iter()
-                        .map(|x| (x - max_output_value).exp())
-                        .collect();
-
-                    let mut exp_output =
-                        Matrix::new_from_vec(expects.rows, expects.cols, processed_output_vec)
-                            .unwrap();
-
-                    // 総和行列を作成する　ブロードキャストできるようにしているので、各サンプルの要素は一つでいい
-                    let mut node_sums: Vec<f64> = Vec::new();
-                    for s in 0..sample_size {
-                        node_sums.push(exp_output.sum_row_elements(s));
-                    }
-                    let mut sum_matrix = Matrix::new_from_vec(sample_size, 1, node_sums).unwrap();
-
-                    let softmax_result = exp_output
-                        .hadamard(&sum_matrix.hadamard_function(|x| 1.0 / (x + 1e-10)))
-                        .unwrap();
-
-                    self.nodes_after_activation[i] = softmax_result;
-                }
-            } else {
-                self.nodes_after_activation[i] =
-                    self.nodes[i].hadamard_function(self.activations[i - 1]);
-            }
-        }
-
-        // 誤差を求める　求めた後にサンプル数で除算
-        let mut mini_batch_error = 0.0;
-
-        let mut output_node = self.nodes_after_activation[output_index].clone();
-
-        // softmax 関数と交差エントロピー誤差を利用する場合
-        if self.output_activation_type == OutputActivationType::SoftmaxAndCrossEntropy {
-            let ln_output = output_node.hadamard_function(|x| (x + 1e-10).ln());
-
-            mini_batch_error = expects.hadamard(&ln_output).unwrap().sum_all_elements();
-        }
-
-        self.error = -mini_batch_error;
-
-        Ok(())
-    }
-
-    pub fn backward(&mut self, expects: &Matrix, eta: f64) -> Result<(), String> {
-        let node_output_index = self.nodes.len() - 1;
-        let other_output_index = node_output_index - 1;
-        let sample_size = self.nodes[0].rows;
-
-        // 出力層のデルタ
-        self.deltas[other_output_index] = (&self.nodes[node_output_index] - expects).unwrap();
-
-        // 隠れ層のデルタ
-        for i in (0..other_output_index).rev() {
-            let delta = &self.deltas[i + 1];
-            let w = self.weights[i + 1].transpose();
-            let u = &mut self.nodes[i + 1];
-            let da = self.differential_activations[i];
-            let da_u = u.hadamard_function(da);
-
-            self.deltas[i] = (delta * &w).unwrap().hadamard(&da_u).unwrap();
-        }
-
-        // 求めたデルタを用いて勾配を計算する
-        for i in (0..=other_output_index).rev() {
-            self.weights[i] -=
-                eta * (&self.nodes_after_activation[i].transpose() * &self.deltas[i]).unwrap();
-            self.biases[i] -= eta * &self.deltas[i].mean_cols();
-        }
-
-        Ok(())
-    }
-
-    pub fn change_sample_size(&mut self, sample_size: usize) {
-        self.nodes
-            .iter_mut()
-            .for_each(|m| m.change_row_size(sample_size));
-        self.nodes_after_activation
-            .iter_mut()
-            .for_each(|m| m.change_row_size(sample_size));
-        self.deltas
-            .iter_mut()
-            .for_each(|m| m.change_row_size(sample_size));
-    }
-
-    pub fn get_input_node_value(&self) -> usize {
-        self.nodes[0].cols
-    }
-
-    pub fn get_output_node_value(&self) -> usize {
-        self.nodes.last().unwrap().cols
-    }
-
-    /// ミニバッチ全体の誤差であることに注意 (バッチ内のサンプルサイズで割られていない)
-    pub fn get_error(&self) -> f64 {
-        self.error
-    }
-
-    pub fn set_error(&mut self, error: f64) {
-        self.error = error;
-    }
-
-    pub fn get_output_nodes(&self) -> &Matrix {
-        self.nodes_after_activation.last().unwrap()
-    }
-
-    pub fn export_ron(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn export_ron(&self) -> Result<(), Box<dyn std::error::Error>> {
         let mut node_values = Vec::<usize>::new();
         let mut layer_infos = Vec::<LayerInfo>::new();
 
-        node_values.push(self.nodes[0].cols);
+        node_values.push(self.weights[0].rows);
 
         for i in 0..self.weights.len() {
             let info = LayerInfo {
@@ -357,41 +226,4 @@ impl FullyConnectedNetwork {
     }
 }
 
-impl NeuralNetwork for FullyConnectedNetwork {
-    fn new(nodes_values: Vec<usize>, sample_value: usize) -> Self {}
-}
-
-impl Display for FullyConnectedNetwork {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let width = f.width().unwrap_or(10);
-        let precision = f.precision().unwrap_or(0);
-
-        for i in 0..self.nodes.len() {
-            if i > 0 {
-                writeln!(f, "Layer {}:", i)?;
-
-                writeln!(f, "\nWeights:")?;
-                write!(f, "{:width$.precision$} ", self.weights[i - 1])?;
-
-                writeln!(f, "\nBiases:")?;
-                write!(f, "{:width$.precision$} ", self.biases[i - 1])?;
-
-                writeln!(f, "\nNodes:")?;
-            } else {
-                writeln!(f, "Input Layer:")?;
-                writeln!(f, "Inputs:")?;
-            }
-
-            write!(
-                f,
-                "{:width$.precision$} ",
-                self.nodes[i],
-                width = width,
-                precision = precision
-            )?;
-
-            writeln!(f)?;
-        }
-        Ok(())
-    }
-}
+impl FullyConnectedNetwork {}

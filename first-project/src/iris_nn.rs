@@ -1,9 +1,14 @@
-use std::{arch::x86_64::_mm_sm4key4_epi32, collections::HashMap, ops::Add, sync::Arc, time};
-
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use core::error;
+use std::{sync::Arc, time};
 
 use crate::{
-    fully_connected_network::*, iris_normalization::iris_normalization, matrix::Matrix, neural_network_base::NeuralNetwork, output_activation_type::OutputActivationType, rand::Rand
+    fully_connected_network::*,
+    iris_normalization::iris_normalization,
+    matrix::Matrix,
+    neural_network_base::{NetworkWorkspace, NeuralNetwork},
+    neural_network_functions::{differential_relu, relu},
+    output_activation_type::OutputActivationType,
+    rand::Rand,
 };
 
 #[derive(Clone)]
@@ -30,26 +35,20 @@ pub fn iris_nn_process() {
     let mini_batch_sample_size = 10;
 
     // iris dataset 用ニューラルネットワーク
-    let mut nn: FullyConnectedNetwork =
-        FullyConnectedNetwork::new(vec![4, 12, 24, 36, 24, 12, 3], mini_batch_sample_size);
-    nn.set_activations(&mut vec![NeuralNetwork::relu, NeuralNetwork::relu, NeuralNetwork::relu, NeuralNetwork::relu, NeuralNetwork::relu, NeuralNetwork::relu]);
+    let mut nn = FullyConnectedNetwork::new(vec![4, 12, 24, 36, 24, 12, 3], mini_batch_sample_size);
+    nn.set_activations(&mut vec![relu, relu, relu, relu, relu, relu]);
     nn.set_differential_activation(&mut vec![
-        NeuralNetwork::differential_relu,
-        NeuralNetwork::differential_relu,
-        NeuralNetwork::differential_relu,
-        NeuralNetwork::differential_relu,
-        NeuralNetwork::differential_relu,
-        NeuralNetwork::differential_relu,
+        differential_relu,
+        differential_relu,
+        differential_relu,
+        differential_relu,
+        differential_relu,
+        differential_relu,
     ]);
     nn.set_output_activation_type(OutputActivationType::SoftmaxAndCrossEntropy);
 
     let epoch_value = 50000;
     let mut r = Rand::new();
-
-    let input_node_value = nn.get_input_node_value();
-    let output_node_value = nn.get_output_node_value();
-
-    let arc_nn = Arc::new(&nn);
 
     // 現在の時刻
     let epochs_now = time::Instant::now();
@@ -65,12 +64,10 @@ pub fn iris_nn_process() {
                 batch.push(&normalization_data[*index]);
             }
 
-            let mut mini_batch = Vec::<SampleData>::new();
+            let mut batch_data: Vec<f64> = Vec::new();
+            let mut expect_data: Vec<f64> = Vec::new();
 
             for data in batch {
-                let mut batch_data: Vec<f64> = Vec::new();
-                let mut expect_data: Vec<f64> = Vec::new();
-
                 batch_data.push(data.sepal_length as f64);
                 batch_data.push(data.sepal_width as f64);
                 batch_data.push(data.petal_length as f64);
@@ -91,35 +88,28 @@ pub fn iris_nn_process() {
                 } else {
                     0.0
                 });
-
-                mini_batch.push(SampleData {
-                    inputs: batch_data,
-                    expects: expect_data,
-                });
             }
 
-            // let inputs =
-            //     Matrix::new_from_vec(mini_batch_sample_size, input_node_value, batch_data).unwrap();
-            // let expects =
-            //     Matrix::new_from_vec(mini_batch_sample_size, output_node_value, expect_data)
-            //         .unwrap();
+            println!("{:?}", expect_data);
+
+            let input_node_value = nn.get_input_node_value();
+            let output_node_value = nn.get_output_node_value();
+
+            let inputs =
+                Matrix::new_from_vec(mini_batch_sample_size, input_node_value, batch_data).unwrap();
+            let expects =
+                Matrix::new_from_vec(mini_batch_sample_size, output_node_value, expect_data)
+                    .unwrap();
 
             // println!("{:7.2}", &expects);
-
-            // let error_sum = mini_batch.par_iter().map(|sample| {
-            //     let mut c_nn = arc_nn.clone();
-            //     c_nn.forward(
-            //         &Matrix::new_from_vec(1, output_node_value, sample.inputs.to_vec()).unwrap(),
-            //         &Matrix::new_from_vec(1, output_node_value, sample.expects.to_vec()).unwrap(),
-            //     ).unwrap();
-            //     c_nn.get_error()
-            // }).reduce(|| 0.0, |grad1, grad2|{
-            //     grad1.add(grad2)
-            // });
 
             // nn.forward(&inputs, &expects).unwrap();
             // epoch_error += nn.get_error();
             // nn.backward(&expects, 0.0007).unwrap();
+
+            let mut workspace = NetworkWorkspace::new_for_network(&nn, mini_batch_sample_size);
+            let gradients = nn.forward_and_backward(&inputs, &expects, &mut workspace).unwrap();
+            nn.update_weights(&gradients, 0.0007);
         }
 
         if (epoch + 1) % 500 == 0 {
@@ -132,10 +122,7 @@ pub fn iris_nn_process() {
         }
     }
 
-    println!(
-        "epochs process duration: {:?}sec.",
-        epochs_now.elapsed().as_secs_f64()
-    );
+    println!("epochs process duration: {:?}sec.", epochs_now.elapsed().as_secs_f64());
 
     // nn.export_ron();
 }

@@ -100,31 +100,15 @@ impl ops::MulAssign<Matrix> for Matrix {
 impl ops::MulAssign<&Matrix> for Matrix {
     fn mul_assign(&mut self, rhs: &Matrix) {
         if self.cols == rhs.rows {
-            let block_size: usize = constants::MATRIX_MULTI_BLOCK_SIZE;
-
             let mut result = Matrix::new(self.rows, rhs.cols);
-
-            let start = time::Instant::now();
-            for i_block in (0..self.rows).step_by(block_size) {
-                for k_block in (0..self.cols).step_by(block_size) {
-                    for j_block in (0..rhs.cols).step_by(block_size) {
-                        let i_end = (i_block + block_size).min(self.rows);
-                        let k_end = (k_block + block_size).min(self.cols);
-                        let j_end = (j_block + block_size).min(rhs.cols);
-
-                        for i in i_block..i_end {
-                            for k in k_block..k_end {
-                                let self_ik = self.data[i * self.cols + k];
-                                for j in j_block..j_end {
-                                    result.data[i * rhs.cols + j] +=
-                                        self_ik * rhs.data[k * rhs.cols + j];
-                                }
-                            }
-                        }
+            for i in 0..self.rows {
+                for k in 0..self.cols {
+                    let self_ik = self[(i, k)];
+                    for j in 0..rhs.cols {
+                        result[(i, j)] += self_ik * rhs[(k, j)];
                     }
                 }
             }
-            println!("actual calc time: {:?}", start.elapsed());
             *self = result;
         } else {
             panic!("Matrices must have compatible dimensions for multiplication");

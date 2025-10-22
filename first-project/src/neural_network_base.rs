@@ -1,7 +1,6 @@
-use core::net;
 use std::ops;
 
-use crate::{matrix::Matrix};
+use crate::{matrix::Matrix, output_activation_type::OutputActivationType};
 
 #[derive(Clone)]
 pub struct Gradients {
@@ -49,20 +48,20 @@ pub struct NetworkWorkspace {
 }
 
 impl NetworkWorkspace {
-    pub fn new_for_network(network_shape: &impl NeuralNetwork) -> Self {
+    pub fn new_for_network(network_shape: &impl NeuralNetwork, sample_value: usize) -> Self {
         let layer_value = network_shape.get_layer_value();
 
         let mut layer_inputs = Vec::<Matrix>::new();
         let mut layer_outputs = Vec::<Matrix>::new();
         let mut layer_deltas = Vec::<Matrix>::new();
 
-        layer_outputs.push(Matrix::new(1, network_shape.get_weight_matrix(0).rows));
+        layer_outputs.push(Matrix::new(sample_value, network_shape.get_weight_matrix(0).rows));
 
         for i in 0..layer_value {
             let mut current_node_value = network_shape.get_weight_matrix(0).cols;
-            layer_inputs.push(Matrix::new(1, current_node_value));
-            layer_outputs.push(Matrix::new(1, current_node_value));
-            layer_deltas.push(Matrix::new(1, current_node_value));
+            layer_inputs.push(Matrix::new(sample_value, current_node_value));
+            layer_outputs.push(Matrix::new(sample_value, current_node_value));
+            layer_deltas.push(Matrix::new(sample_value, current_node_value));
         }
 
         let error = 0.0;
@@ -86,33 +85,13 @@ pub trait NeuralNetwork {
         expects: &Matrix,
         workspace: &mut NetworkWorkspace,
     ) -> Result<Gradients, String>;
-    fn update_weights(&mut self, workspace: &mut NetworkWorkspace);
+    fn update_weights(&mut self, gradients: &Gradients, eta: f64);
+    fn set_activations(&mut self, activations: &mut Vec<fn(&f64) -> f64>);
+    fn set_differential_activation(&mut self, differentials: &mut Vec<fn(&f64) -> f64>);
+    fn set_output_activation_type(&mut self, activation_type: OutputActivationType);
     fn get_layer_value(&self) -> usize;
+    fn get_input_node_value(&self) -> usize;
+    fn get_output_node_value(&self) -> usize;
     fn get_weight_matrix(&self, index: usize) -> &Matrix;
-
-    fn relu(x: &f64) -> f64 {
-        x.max(0.0)
-    }
-
-    fn differential_relu(x: &f64) -> f64 {
-        if *x > 0.0 { 1.0 } else { 0.0 }
-    }
-
-    fn leaky_relu(x: &f64) -> f64 {
-        if *x > 0.0 { *x } else { 0.01 * *x }
-    }
-
-    fn differential_leaky_relu(x: &f64) -> f64 {
-        if *x > 0.0 { 1.0 } else { 0.01 }
-    }
-
-    fn softmax(z: &mut Matrix) {
-        let nodes_exp_sum: f64 = z.data.iter().map(|x| x.exp()).sum();
-        for i in 0..z.rows {
-            for j in 0..z.cols {
-                let before_normalize = z.get(i, j).unwrap();
-                z.set(i, j, before_normalize.exp() / nodes_exp_sum).unwrap();
-            }
-        }
-    }
+    fn export_ron(&self) -> Result<(), Box<dyn std::error::Error>>;
 }

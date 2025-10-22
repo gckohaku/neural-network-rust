@@ -10,11 +10,10 @@ mod iris_normalization;
 mod matrix_mul_calc_speed;
 mod constants;
 mod neural_network_base;
+mod neural_network_functions;
 
 fn main() {
-    // iris_nn_process();
+    iris_nn_process();
 
     // iris_analyze();
-
-    matrix_mul_calc_speed::calc();
 }
