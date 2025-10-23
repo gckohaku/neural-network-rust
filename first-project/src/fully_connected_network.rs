@@ -106,18 +106,18 @@ impl NeuralNetwork for FullyConnectedNetwork {
                         .map(|x| (x - max_input_value).exp())
                         .collect();
 
-                    let mut exp_input =
-                        Matrix::new_from_vec(expects.rows, expects.cols, processed_input_vec.clone())
-                            .unwrap();
+                    let mut exp_input = Matrix::new_from_vec(
+                        expects.rows,
+                        expects.cols,
+                        processed_input_vec.clone(),
+                    )
+                    .unwrap();
 
                     if exp_input[(0, 0)].is_nan() {
                         println!("NAN IS APPEAR (CODE: CALC_EXP_INPUT)");
                         println!(
                             "{},\n{:?},\n{:?},\n{:?}",
-                            i,
-                            &processed_input_vec,
-                            workspace.layer_inputs[i],
-                            &exp_input
+                            i, &processed_input_vec, workspace.layer_inputs[i], &exp_input
                         );
                         panic!("calc weights is NAN");
                     }
@@ -143,7 +143,7 @@ impl NeuralNetwork for FullyConnectedNetwork {
                     }
 
                     let softmax_result = exp_input
-                        .hadamard(&sum_matrix.hadamard_function(|x| 1.0 / (x)))
+                        .hadamard(&sum_matrix.hadamard_function(|x| 1.0 / x))
                         .unwrap();
 
                     workspace.layer_outputs[i + 1] = softmax_result.clone();
