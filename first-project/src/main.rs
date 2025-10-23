@@ -1,6 +1,7 @@
 use crate::iris_nn::{calc_average_and_variance, calc_kurtosis, calc_skewness, iris_nn_process};
 
 mod iris_nn;
+mod iris_nn_mt;
 mod matrix;
 mod fully_connected_network;
 mod output_activation_type;

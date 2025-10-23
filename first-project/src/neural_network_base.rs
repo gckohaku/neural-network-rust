@@ -44,8 +44,6 @@ pub struct NetworkWorkspace {
     pub layer_outputs: Vec<Matrix>,
     pub layer_deltas: Vec<Matrix>,
     pub error: f64,
-    // ↓あとで消す
-    // pub local_gradients: Gradients,
     pub next_weights: Vec<Matrix>,
     pub next_biases: Vec<Matrix>,
 }
