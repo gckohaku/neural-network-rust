@@ -90,15 +90,6 @@ impl NeuralNetwork for FullyConnectedNetwork {
                         .iter()
                         .fold(0.0 / 0.0, |m, v: &f64| v.max(m));
 
-                    if max_input_value.is_nan() {
-                        println!("NAN IS APPEAR (CODE: CALC_MAX_INPUT_VALUE)");
-                        println!(
-                            "{},\n{},\n{:?}",
-                            max_input_value, max_input_value, workspace.layer_inputs[i]
-                        );
-                        panic!("calc weights is NAN");
-                    }
-
                     // 減算
                     let processed_input_vec: Vec<f64> = workspace.layer_inputs[i]
                         .data
@@ -113,15 +104,6 @@ impl NeuralNetwork for FullyConnectedNetwork {
                     )
                     .unwrap();
 
-                    if exp_input[(0, 0)].is_nan() {
-                        println!("NAN IS APPEAR (CODE: CALC_EXP_INPUT)");
-                        println!(
-                            "{},\n{:?},\n{:?},\n{:?}",
-                            i, &processed_input_vec, workspace.layer_inputs[i], &exp_input
-                        );
-                        panic!("calc weights is NAN");
-                    }
-
                     // 総和行列を作成する　ブロードキャストできるようにしているので、各サンプルの要素は一つでいい
                     let mut node_sums: Vec<f64> = Vec::new();
                     for s in 0..sample_size {
@@ -130,36 +112,11 @@ impl NeuralNetwork for FullyConnectedNetwork {
                     let mut sum_matrix =
                         Matrix::new_from_vec(sample_size, 1, node_sums.clone()).unwrap();
 
-                    if sum_matrix[(0, 0)].is_nan() {
-                        println!("NAN IS APPEAR (CODE: CALC_SUM_MATRIX)");
-                        println!(
-                            "{},\n{:?},\n{:?},\n{:?}",
-                            i,
-                            node_sums.clone(),
-                            &sum_matrix,
-                            &exp_input
-                        );
-                        panic!("calc weights is NAN");
-                    }
-
                     let softmax_result = exp_input
                         .hadamard(&sum_matrix.hadamard_function(|x| 1.0 / x))
                         .unwrap();
 
                     workspace.layer_outputs[i + 1] = softmax_result.clone();
-
-                    if workspace.layer_outputs[i + 1][(0, 0)].is_nan() {
-                        println!("NAN IS APPEAR (CODE: CALC_SOFTMAX)");
-                        println!(
-                            "{},\n{:?},\n{:?},\n{:?},\n{:?}",
-                            i,
-                            &workspace.layer_outputs[i + 1],
-                            &sum_matrix,
-                            &exp_input,
-                            &softmax_result
-                        );
-                        panic!("calc weights is NAN");
-                    }
                 }
             } else {
                 workspace.layer_outputs[i + 1] =
