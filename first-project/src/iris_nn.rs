@@ -47,7 +47,7 @@ pub fn iris_nn_process() {
     ]);
     nn.set_output_activation_type(OutputActivationType::SoftmaxAndCrossEntropy);
 
-    let epoch_value = 10000;
+    let epoch_value = 50000;
     let mut r = Rand::new();
 
     // 現在の時刻
@@ -108,8 +108,8 @@ pub fn iris_nn_process() {
             // nn.backward(&expects, 0.0007).unwrap();
 
             nn.forward_and_backward(&inputs, &expects, &mut workspace, 0.0007);
-            nn.update_weights(&mut workspace.next_weights, &mut workspace.next_biases);
             epoch_error += workspace.error;
+            nn.update_weights(&mut workspace.next_weights, &mut workspace.next_biases);
         }
 
         if (epoch + 1) % 500 == 0 {
@@ -120,11 +120,16 @@ pub fn iris_nn_process() {
             );
             // print!("{:8.4}", nn.get_output_nodes());
         }
+
+        // println!("{:?}", nn.get_weight_matrix(5)[(0, 0)]);
     }
 
-    println!("epochs process duration: {:?}sec.", epochs_now.elapsed().as_secs_f64());
+    println!(
+        "epochs process duration: {:?}sec.",
+        epochs_now.elapsed().as_secs_f64()
+    );
 
-    // nn.export_ron();
+    nn.export_ron();
 }
 
 fn generate_shuffle_array(value: usize, r: &mut Rand) -> Vec<usize> {

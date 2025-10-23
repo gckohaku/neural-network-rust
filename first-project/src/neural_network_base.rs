@@ -45,7 +45,7 @@ pub struct NetworkWorkspace {
     pub layer_deltas: Vec<Matrix>,
     pub error: f64,
     // ↓あとで消す
-    pub local_gradients: Gradients,
+    // pub local_gradients: Gradients,
     pub next_weights: Vec<Matrix>,
     pub next_biases: Vec<Matrix>,
 }
@@ -76,14 +76,12 @@ impl NetworkWorkspace {
         }
 
         let error = 0.0;
-        let local_gradients = Gradients::new(network_shape);
 
         NetworkWorkspace {
             layer_inputs: layer_inputs,
             layer_outputs: layer_outputs,
             layer_deltas: layer_deltas,
             error: error,
-            local_gradients: local_gradients,
             next_weights: next_weights,
             next_biases: next_biases,
         }
