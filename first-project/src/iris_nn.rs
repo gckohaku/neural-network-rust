@@ -35,7 +35,7 @@ pub fn iris_nn_process() {
     let mini_batch_sample_size = 10;
 
     // iris dataset 用ニューラルネットワーク
-    let mut nn = FullyConnectedNetwork::new(vec![4, 12, 24, 36, 24, 12, 3], mini_batch_sample_size);
+    let mut nn = FullyConnectedNetwork::new(vec![4, 6, 8, 6, 3], mini_batch_sample_size);
     nn.set_activations(&mut vec![relu, relu, relu, relu, relu, relu]);
     nn.set_differential_activation(&mut vec![
         differential_relu,
@@ -47,8 +47,18 @@ pub fn iris_nn_process() {
     ]);
     nn.set_output_activation_type(OutputActivationType::SoftmaxAndCrossEntropy);
 
-    let epoch_value = 10000;
+    let epoch_value = 2000;
     let mut r = Rand::new();
+
+    let shuffle_index = generate_shuffle_array(150, &mut r);
+    let mut learn_data_set = Vec::new();
+    for index in 0..120 {
+        learn_data_set.push(&normalization_data[shuffle_index[index]]);
+    }
+    let mut test_data_set = Vec::new();
+    for index in 120..150 {
+        test_data_set.push(&normalization_data[shuffle_index[index]]);
+    }
 
     // 現在の時刻
     let epochs_now = time::Instant::now();
@@ -56,14 +66,14 @@ pub fn iris_nn_process() {
     let mut workspace = NetworkWorkspace::new_for_network(&nn, mini_batch_sample_size);
 
     for epoch in 0..epoch_value {
-        let shuffle_index = generate_shuffle_array(normalization_data.len(), &mut r);
+        let shuffle_index = generate_shuffle_array(learn_data_set.len(), &mut r);
         let mut epoch_error = 0.0;
 
         for indexes in shuffle_index.chunks(mini_batch_sample_size) {
             let mut batch = Vec::new();
 
             for index in indexes {
-                batch.push(&normalization_data[*index]);
+                batch.push(&learn_data_set[*index]);
             }
 
             let mut batch_data: Vec<f64> = Vec::new();
@@ -107,17 +117,73 @@ pub fn iris_nn_process() {
             // epoch_error += nn.get_error();
             // nn.backward(&expects, 0.0007).unwrap();
 
-            nn.forward_and_backward(&inputs, &expects, &mut workspace, 0.0007);
+            nn.forward_and_backward(&inputs, &expects, &mut workspace, 0.0002);
             epoch_error += workspace.error;
             nn.update_weights(&mut workspace.next_weights, &mut workspace.next_biases);
         }
 
-        if (epoch + 1) % 500 == 0 {
+        if (epoch + 1) % 50 == 0 {
             println!(
                 "epoch {:6} error: {:13.10}",
                 epoch + 1,
-                epoch_error / irisdata::IRIS_DATA.len() as f64
+                epoch_error / learn_data_set.len() as f64
             );
+
+            let mut test_data: Vec<f64> = Vec::new();
+            let mut expect_data: Vec<f64> = Vec::new();
+
+            for data in &test_data_set {
+                test_data.push(data.sepal_length as f64);
+                test_data.push(data.sepal_width as f64);
+                test_data.push(data.petal_length as f64);
+                test_data.push(data.petal_width as f64);
+
+                expect_data.push(if data.species == irisdata::Species::IrisSetosa {
+                    1.0
+                } else {
+                    0.0
+                });
+                expect_data.push(if data.species == irisdata::Species::IrisVersicolor {
+                    1.0
+                } else {
+                    0.0
+                });
+                expect_data.push(if data.species == irisdata::Species::IrisVirginica {
+                    1.0
+                } else {
+                    0.0
+                });
+            }
+
+            let test_input = Matrix::new_from_vec(30, 4, test_data).unwrap();
+            let test_expect = Matrix::new_from_vec(30, 3, expect_data).unwrap();
+
+            let test_result = nn.forward_only(&test_input, &test_expect, &mut workspace);
+
+            let mut result_string = "".to_string();
+            for row in 0..test_result.rows {
+                let mut max_test_col = 0;
+                let mut max_expect_col = 0;
+                for col in 1..test_result.cols {
+                    if test_result[(row, col)] > test_result[(row, max_test_col)] {
+                        max_test_col = col;
+                    }
+                    if test_expect[(row, col)] > test_expect[(row, max_expect_col)] {
+                        max_expect_col = col;
+                    }
+                }
+                result_string += if max_expect_col == max_test_col {
+                    "o"
+                } else {
+                    "x"
+                }
+            }
+
+            println!(
+                "{}    {}/30",
+                result_string,
+                result_string.chars().filter(|c| *c == 'o').count()
+            )
         }
     }
 
