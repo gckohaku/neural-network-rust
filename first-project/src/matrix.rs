@@ -5,7 +5,7 @@ mod sub;
 
 use std::{
     fmt::{Debug, Display},
-    ops, result, vec,
+    ops, vec,
 };
 
 #[derive(Clone, Debug)]
@@ -25,9 +25,11 @@ impl Matrix {
     }
 
     pub fn new_and_fill(rows: usize, cols: usize, value: f64) -> Matrix {
-        let mut matrix = Matrix::new(rows, cols);
-        matrix.fill(value);
-        matrix
+        Matrix {
+            rows,
+            cols,
+            data: vec![value; rows * cols],
+        }
     }
 
     pub fn new_from_vec(rows: usize, cols: usize, data: Vec<f64>) -> Result<Matrix, String> {
@@ -85,11 +87,12 @@ impl Matrix {
     }
 
     pub fn fill(&mut self, value: f64) {
-        for i in 0..self.rows {
-            for j in 0..self.cols {
-                self.set(i, j, value).unwrap();
-            }
-        }
+        // for i in 0..self.rows {
+        //     for j in 0..self.cols {
+        //         self.set(i, j, value).unwrap();
+        //     }
+        // }
+        self.data = vec![value; self.rows * self.cols];
     }
 
     pub fn transpose(&self) -> Matrix {

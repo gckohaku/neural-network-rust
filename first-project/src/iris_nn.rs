@@ -1,9 +1,31 @@
-use std::{arch::x86_64::_mm_sm4key4_epi32, collections::HashMap, time};
+use core::error;
+use std::{sync::Arc, time};
 
 use crate::{
-    iris_normalization::iris_normalization, matrix::Matrix, neural_network::*,
-    output_activation_type::OutputActivationType, rand::Rand,
+    fully_connected_network::*,
+    iris_normalization::iris_normalization,
+    matrix::Matrix,
+    neural_network_base::{NetworkWorkspace, NeuralNetwork},
+    neural_network_functions::{differential_relu, relu},
+    output_activation_type::OutputActivationType,
+    rand::Rand,
 };
+
+#[derive(Clone)]
+struct SampleData {
+    inputs: Vec<f64>,
+    expects: Vec<f64>,
+}
+
+impl SampleData {
+    #[inline]
+    fn new() -> SampleData {
+        SampleData {
+            inputs: vec![],
+            expects: vec![],
+        }
+    }
+}
 
 pub fn iris_nn_process() {
     let normalization_data = iris_normalization(&irisdata::IRIS_DATA);
@@ -13,7 +35,7 @@ pub fn iris_nn_process() {
     let mini_batch_sample_size = 10;
 
     // iris dataset 用ニューラルネットワーク
-    let mut nn = NeuralNetwork::new(vec![4, 12, 24, 36, 24, 12, 3], mini_batch_sample_size);
+    let mut nn = FullyConnectedNetwork::new(vec![4, 12, 24, 36, 24, 12, 3], mini_batch_sample_size);
     nn.set_activations(&mut vec![relu, relu, relu, relu, relu, relu]);
     nn.set_differential_activation(&mut vec![
         differential_relu,
@@ -25,11 +47,13 @@ pub fn iris_nn_process() {
     ]);
     nn.set_output_activation_type(OutputActivationType::SoftmaxAndCrossEntropy);
 
-    let epoch_value = 50000;
+    let epoch_value = 10000;
     let mut r = Rand::new();
 
     // 現在の時刻
     let epochs_now = time::Instant::now();
+
+    let mut workspace = NetworkWorkspace::new_for_network(&nn, mini_batch_sample_size);
 
     for epoch in 0..epoch_value {
         let shuffle_index = generate_shuffle_array(normalization_data.len(), &mut r);
@@ -79,9 +103,13 @@ pub fn iris_nn_process() {
 
             // println!("{:7.2}", &expects);
 
-            nn.forward(&inputs, &expects).unwrap();
-            epoch_error += nn.get_error();
-            nn.backward(&expects, 0.0007).unwrap();
+            // nn.forward(&inputs, &expects).unwrap();
+            // epoch_error += nn.get_error();
+            // nn.backward(&expects, 0.0007).unwrap();
+
+            nn.forward_and_backward(&inputs, &expects, &mut workspace, 0.0007);
+            epoch_error += workspace.error;
+            nn.update_weights(&mut workspace.next_weights, &mut workspace.next_biases);
         }
 
         if (epoch + 1) % 500 == 0 {
@@ -90,11 +118,13 @@ pub fn iris_nn_process() {
                 epoch + 1,
                 epoch_error / irisdata::IRIS_DATA.len() as f64
             );
-            // print!("{:8.4}", nn.get_output_nodes());
         }
     }
 
-    println!("epochs process duration: {:?}sec.", epochs_now.elapsed().as_secs_f64());
+    println!(
+        "epochs process duration: {:?}sec.",
+        epochs_now.elapsed().as_secs_f64()
+    );
 
     // nn.export_ron();
 }
@@ -333,8 +363,3 @@ pub fn calc_kurtosis(data: &Vec<f32>, average: f32, variance: f32) -> f32 {
     (((n * (n + 1.0)) / ((n - 1.0) * (n - 2.0) * (n - 3.0))) * kurtosis)
         - ((3.0 * (n - 1.0).powi(2)) / ((n - 2.0) * (n - 3.0)))
 }
-
-// https://data-viz-lab.com/stats#1-3median
-// https://bellcurve.jp/statistics/course/17950.html?srsltid=AfmBOorSvnzQ2VbbF0zl1FEPcJPezuEky5RmhmDf5cK_I6S0ZMxvePNk
-// https://bellcurve.jp/statistics/glossary/2113.html
-// https://zenn.dev/utcarnivaldayo/articles/ffeed5ac2e62bb
