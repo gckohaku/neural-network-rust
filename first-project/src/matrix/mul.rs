@@ -1,4 +1,4 @@
-use std::ops::{self, MulAssign};
+use std::ops::{self};
 
 use crate::
     matrix::Matrix

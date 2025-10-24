@@ -47,7 +47,7 @@ pub fn iris_nn_process() {
     ]);
     nn.set_output_activation_type(OutputActivationType::SoftmaxAndCrossEntropy);
 
-    let epoch_value = 50000;
+    let epoch_value = 10000;
     let mut r = Rand::new();
 
     // 現在の時刻
@@ -138,12 +138,19 @@ pub fn iris_nn_process() {
                     },
                 );
 
-            nn.update_weights(&mut next_weights, &mut next_biases);
+                let mut average_weights = Vec::new();
+                let mut average_biasese = Vec::new();
+                for i in 0..next_weights.len() {
+                    average_weights.push((&next_weights[i] / mini_batch_sample_size as f64).unwrap());
+                    average_biasese.push((&next_biases[i] / mini_batch_sample_size as f64).unwrap());
+                }
+
+            nn.update_weights(&mut average_weights, &mut average_biasese);
 
             epoch_error += error;
         }
 
-        if (epoch + 1) % 500 == 0 {
+        if (epoch + 1) % 100 == 0 {
             println!(
                 "epoch {:6} error: {:13.10}",
                 epoch + 1,

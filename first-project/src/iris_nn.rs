@@ -47,7 +47,7 @@ pub fn iris_nn_process() {
     ]);
     nn.set_output_activation_type(OutputActivationType::SoftmaxAndCrossEntropy);
 
-    let epoch_value = 50000;
+    let epoch_value = 10000;
     let mut r = Rand::new();
 
     // 現在の時刻
@@ -118,10 +118,7 @@ pub fn iris_nn_process() {
                 epoch + 1,
                 epoch_error / irisdata::IRIS_DATA.len() as f64
             );
-            // print!("{:8.4}", nn.get_output_nodes());
         }
-
-        // println!("{:?}", nn.get_weight_matrix(5)[(0, 0)]);
     }
 
     println!(
@@ -366,8 +363,3 @@ pub fn calc_kurtosis(data: &Vec<f32>, average: f32, variance: f32) -> f32 {
     (((n * (n + 1.0)) / ((n - 1.0) * (n - 2.0) * (n - 3.0))) * kurtosis)
         - ((3.0 * (n - 1.0).powi(2)) / ((n - 2.0) * (n - 3.0)))
 }
-
-// https://data-viz-lab.com/stats#1-3median
-// https://bellcurve.jp/statistics/course/17950.html?srsltid=AfmBOorSvnzQ2VbbF0zl1FEPcJPezuEky5RmhmDf5cK_I6S0ZMxvePNk
-// https://bellcurve.jp/statistics/glossary/2113.html
-// https://zenn.dev/utcarnivaldayo/articles/ffeed5ac2e62bb
