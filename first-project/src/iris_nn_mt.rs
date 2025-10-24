@@ -64,48 +64,83 @@ pub fn iris_nn_process() {
                 batch.push(&normalization_data[*index]);
             }
 
-			let mut mini_batch_data = Vec::<SampleData>::new();
+            let mut mini_batch_data = Vec::<SampleData>::new();
 
             for data in batch {
-				let mut sample_data = SampleData::new();
+                let mut sample_data = SampleData::new();
 
                 sample_data.inputs.push(data.sepal_length as f64);
                 sample_data.inputs.push(data.sepal_width as f64);
                 sample_data.inputs.push(data.petal_length as f64);
                 sample_data.inputs.push(data.petal_width as f64);
 
-                sample_data.expects.push(if data.species == irisdata::Species::IrisSetosa {
-                    1.0
-                } else {
-                    0.0
-                });
-                sample_data.expects.push(if data.species == irisdata::Species::IrisVersicolor {
-                    1.0
-                } else {
-                    0.0
-                });
-                sample_data.expects.push(if data.species == irisdata::Species::IrisVirginica {
-                    1.0
-                } else {
-                    0.0
-                });
+                sample_data
+                    .expects
+                    .push(if data.species == irisdata::Species::IrisSetosa {
+                        1.0
+                    } else {
+                        0.0
+                    });
+                sample_data
+                    .expects
+                    .push(if data.species == irisdata::Species::IrisVersicolor {
+                        1.0
+                    } else {
+                        0.0
+                    });
+                sample_data
+                    .expects
+                    .push(if data.species == irisdata::Species::IrisVirginica {
+                        1.0
+                    } else {
+                        0.0
+                    });
 
-				mini_batch_data.push(sample_data);
+                mini_batch_data.push(sample_data);
             }
 
             let input_node_value = nn.get_input_node_value();
             let output_node_value = nn.get_output_node_value();
 
-			// 誤差と次の重みとバイアスの平均を受け取るタプルを返すようにする
-			let error = mini_batch_data.par_iter().map(|data| {
-				let mut workspace = NetworkWorkspace::new_for_network(&nn, 1);
+            // 誤差と次の重みとバイアスの平均を受け取るタプルを返すようにする
+            let (error, mut next_weights, mut next_biases) = mini_batch_data
+                .par_iter()
+                .map(|data| {
+                    let mut workspace = NetworkWorkspace::new_for_network(&nn, 1);
 
-				nn.forward_and_backward(&Matrix::new_from_vec(1 ,input_node_value, data.inputs.clone()).unwrap(), &Matrix::new_from_vec(1, output_node_value, data.expects.clone()).unwrap(), &mut workspace, 0.0007);
-			});
-			// reduce で誤差 (加算値) と、次の重み、バイアスの平均を返す
-			// 重みとバイアスを更新する
+                    nn.forward_and_backward(
+                        &Matrix::new_from_vec(1, input_node_value, data.inputs.clone()).unwrap(),
+                        &Matrix::new_from_vec(1, output_node_value, data.expects.clone()).unwrap(),
+                        &mut workspace,
+                        0.0007,
+                    );
 
-			// 重みを加算する
+                    (
+                        workspace.error,
+                        workspace.next_weights,
+                        workspace.next_biases,
+                    )
+                })
+                .reduce(
+                    || (0.0, Vec::new(), Vec::new()),
+                    |mut current, next| {
+                        if current.1.len() == 0 {
+                            return next;
+                        }
+
+                        current.0 += next.0;
+                        for i in 0..current.1.len() {
+                            current.1[i] += &next.1[i];
+                            current.2[i] += &next.2[i];
+                        }
+
+                        current
+                    },
+                );
+
+            nn.update_weights(&mut next_weights, &mut next_biases);
+
+            epoch_error += error;
         }
 
         if (epoch + 1) % 500 == 0 {

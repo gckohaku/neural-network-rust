@@ -142,17 +142,6 @@ impl NeuralNetwork for FullyConnectedNetwork {
         workspace.layer_deltas[output_index] =
             (&workspace.layer_outputs[output_index + 1] - expects).unwrap();
 
-        if workspace.layer_deltas[output_index][(0, 0)].is_nan() {
-            println!("NAN IS APPEAR (CODE: CALC_OUTPUT_DELTA)");
-            println!(
-                "{},\n{:?},\n{:?}",
-                output_index,
-                &workspace.layer_outputs[output_index + 1],
-                expects
-            );
-            panic!("calc weights is NAN");
-        }
-
         // 隠れ層のデルタ
         for i in (0..output_index).rev() {
             let delta = &workspace.layer_deltas[i + 1];
@@ -173,28 +162,10 @@ impl NeuralNetwork for FullyConnectedNetwork {
                 .unwrap();
             workspace.next_biases[i] =
                 (&self.biases[i] - &(eta * workspace.layer_deltas[i].mean_cols())).unwrap();
-
-            if workspace.next_weights[i][(0, 0)].is_nan() {
-                println!("NAN IS APPEAR (CODE: CALC_NEXT_WEIGHTS)");
-                println!(
-                    "{},\n{:?},\n{:?}",
-                    i, &workspace.layer_outputs[i], &workspace.layer_deltas[i]
-                );
-                panic!("calc weights is NAN");
-            }
-
-            // workspace.local_gradients.weights[i] =
-            //     (&workspace.layer_outputs[i].transpose() * &workspace.layer_deltas[i]).unwrap();
-            // workspace.local_gradients.biases[i] = workspace.layer_deltas[i].mean_cols();
         }
     }
 
     fn update_weights(&mut self, next_weights: &mut Vec<Matrix>, next_biases: &mut Vec<Matrix>) {
-        // for index in 0..gradients.weights.len() {
-        //     self.weights[index] -= eta * &gradients.weights[index];
-        //     self.biases[index] -= eta * &gradients.biases[index];
-        // }
-
         std::mem::swap(&mut self.weights, next_weights);
         std::mem::swap(&mut self.biases, next_biases);
     }

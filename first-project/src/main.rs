@@ -14,7 +14,7 @@ mod neural_network_base;
 mod neural_network_functions;
 
 fn main() {
-    iris_nn_process();
+    iris_nn::iris_nn_process();
 
     // iris_analyze();
 }
