@@ -12,6 +12,7 @@ mod matrix_mul_calc_speed;
 mod constants;
 mod neural_network_base;
 mod neural_network_functions;
+mod mnist_nn;
 
 fn main() {
     iris_nn::iris_nn_process();
