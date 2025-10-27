@@ -233,4 +233,65 @@ impl NeuralNetwork for FullyConnectedNetwork {
     }
 }
 
-impl FullyConnectedNetwork {}
+impl FullyConnectedNetwork {
+    pub fn forward_only(&self, inputs: &Matrix, expects: &Matrix, workspace: &mut NetworkWorkspace) -> Matrix {
+        let sample_size = inputs.rows;
+        let output_index = self.weights.len() - 1;
+
+        // まず、順伝播を行う
+        workspace.layer_outputs[0] = inputs.clone();
+
+        for i in 0..self.weights.len() {
+            workspace.layer_inputs[i] =
+                (&workspace.layer_outputs[i] * &self.weights[i] + &self.biases[i]).unwrap();
+
+            // 出力層かつ目的関数を別途指定している場合、設定に応じて処理が分かれる
+            if i >= self.weights.len() - 1
+                && self.output_activation_type != OutputActivationType::Default
+            {
+                // softmax 関数と交差エントロピー誤差を利用する場合
+                if self.output_activation_type == OutputActivationType::SoftmaxAndCrossEntropy {
+                    // オーバーフロー対策として、node に入れる値は max(ノードの入力値) で減算する
+                    // Vec<f64> の最大値はこうすることで取得できるらしい
+                    let max_input_value: f64 = workspace.layer_inputs[i]
+                        .data
+                        .iter()
+                        .fold(0.0 / 0.0, |m, v: &f64| v.max(m));
+
+                    // 減算
+                    let processed_input_vec: Vec<f64> = workspace.layer_inputs[i]
+                        .data
+                        .iter()
+                        .map(|x| (x - max_input_value).exp())
+                        .collect();
+
+                    let mut exp_input = Matrix::new_from_vec(
+                        expects.rows,
+                        expects.cols,
+                        processed_input_vec.clone(),
+                    )
+                    .unwrap();
+
+                    // 総和行列を作成する　ブロードキャストできるようにしているので、各サンプルの要素は一つでいい
+                    let mut node_sums: Vec<f64> = Vec::new();
+                    for s in 0..sample_size {
+                        node_sums.push(exp_input.sum_row_elements(s));
+                    }
+                    let mut sum_matrix =
+                        Matrix::new_from_vec(sample_size, 1, node_sums.clone()).unwrap();
+
+                    let softmax_result = exp_input
+                        .hadamard(&sum_matrix.hadamard_function(|x| 1.0 / x))
+                        .unwrap();
+
+                    workspace.layer_outputs[i + 1] = softmax_result.clone();
+                }
+            } else {
+                workspace.layer_outputs[i + 1] =
+                    workspace.layer_inputs[i].hadamard_function(self.activations[i]);
+            }
+        }
+
+        workspace.layer_outputs.last().unwrap().clone()
+    }
+}
