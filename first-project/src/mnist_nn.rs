@@ -49,6 +49,10 @@ pub fn mnist_process() {
         .training_set_length(training_value)
         .validation_set_length(validation_value)
         .test_set_length(test_value)
+        .training_images_filename("train-images.idx3-ubyte")
+        .training_labels_filename("train-labels.idx1-ubyte")
+        .test_images_filename("t10k-images.idx3-ubyte")
+        .test_labels_filename("t10k-labels.idx1-ubyte")
         .finalize()
         .normalize();
 
