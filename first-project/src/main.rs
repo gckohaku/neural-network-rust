@@ -13,6 +13,7 @@ mod constants;
 mod neural_network_base;
 mod neural_network_functions;
 mod mnist_nn;
+mod mnist_nn_mt;
 mod utilities;
 
 fn main() {
