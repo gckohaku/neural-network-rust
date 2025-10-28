@@ -1,6 +1,7 @@
-use std::time;
+use std::{cell::RefCell, sync::Arc, time};
 
 use mnist::MnistBuilder;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     fully_connected_network::FullyConnectedNetwork,
@@ -12,14 +13,16 @@ use crate::{
     utilities::shuffle::generate_shuffle_array,
 };
 
+struct MiniBatchParSample {
+    input: Vec<f64>,
+    expect: Vec<f64>,
+}
+
 pub fn mnist_process() {
     let mini_batch_sample_size = 100;
 
     // ニューラルネットワーク初期化
-    let mut nn = FullyConnectedNetwork::new(
-        vec![784, 1568, 784, 392, 196, 49, 10],
-        mini_batch_sample_size,
-    );
+    let mut nn = FullyConnectedNetwork::new(vec![784, 1568, 784, 392, 196, 49, 10], 1);
     nn.set_activations(&mut vec![relu, relu, relu, relu, relu, relu]);
     nn.set_differential_activation(&mut vec![
         differential_relu,
@@ -35,7 +38,7 @@ pub fn mnist_process() {
     let output_node_value = nn.get_output_node_value();
 
     let mut r = Rand::new();
-    let mut workspace = NetworkWorkspace::new_for_network(&nn, mini_batch_sample_size);
+    let mut workspace = NetworkWorkspace::new_for_network(&nn, 1);
 
     let epoch_value = 10;
 
@@ -58,21 +61,26 @@ pub fn mnist_process() {
 
     println!("{}", mnist.trn_img.len());
 
+    let arc_nn = Arc::new(nn.clone());
+
     // 現在の時刻
-    let epochs_now = time::Instant::now();
+    let epochs_now: time::Instant = time::Instant::now();
 
     for epoch in 0..epoch_value {
         let shuffle_index = generate_shuffle_array(training_value.try_into().unwrap(), &mut r);
         let mut epoch_error = 0.0;
 
         let mut mini_batch_count = 0;
+        let workspace = NetworkWorkspace::new_for_network(&nn, 1);
 
         for indexes in shuffle_index.chunks(mini_batch_sample_size) {
             mini_batch_count += 1;
-            let mut batch_data: Vec<f64> = Vec::new();
-            let mut expect_data: Vec<f64> = Vec::new();
+            let mut mini_batch_par_sample: Vec<MiniBatchParSample> = Vec::new();
 
             for index in indexes {
+                let mut batch_data: Vec<f64> = Vec::new();
+                let mut expect_data: Vec<f64> = Vec::new();
+
                 let trn_data: &Vec<f64> = &mnist.trn_img
                     [(*index) * image_dot_value..((*index) + 1) * image_dot_value]
                     .iter()
@@ -85,20 +93,71 @@ pub fn mnist_process() {
                     .map(|&x| x as f64)
                     .collect();
                 expect_data.extend_from_slice(trn_label);
+
+                mini_batch_par_sample.push(MiniBatchParSample {
+                    input: batch_data,
+                    expect: expect_data,
+                });
             }
 
-            let inputs =
-                Matrix::new_from_vec(mini_batch_sample_size, input_node_value, batch_data).unwrap();
-            let expects =
-                Matrix::new_from_vec(mini_batch_sample_size, output_node_value, expect_data)
-                    .unwrap();
+            // let inputs =
+            //     Matrix::new_from_vec(mini_batch_sample_size, input_node_value, batch_data).unwrap();
+            // let expects =
+            //     Matrix::new_from_vec(mini_batch_sample_size, output_node_value, expect_data)
+            //         .unwrap();
 
-            nn.forward_and_backward(&inputs, &expects, &mut workspace, 0.001);
-            epoch_error += workspace.error;
-            if (workspace.error.is_nan()) {
-                panic!("error is NaN");
+            //  スレッドローカルなワークスペースを作成
+            thread_local! (
+                pub static WORKSPACE: RefCell<NetworkWorkspace> = RefCell::new(NetworkWorkspace::new_for_network(&nn, 1))
+            );
+
+            let (error, next_weights, next_biases) = mini_batch_par_sample
+                .par_iter()
+                .map(|sample| {
+                    let local_nn = Arc::clone(&arc_nn);
+
+                    let mut workspace = NetworkWorkspace::new_for_network(&nn, 1);
+
+                    local_nn.forward_and_backward(
+                        &Matrix::new_from_vec(1, input_node_value, sample.input.clone()).unwrap(),
+                        &Matrix::new_from_vec(1, output_node_value, sample.expect.clone()).unwrap(),
+                        &mut workspace,
+                        0.001,
+                    );
+
+                    (
+                        workspace.error,
+                        workspace.next_weights,
+                        workspace.next_biases,
+                    )
+                })
+                .reduce(
+                    || (0.0, Vec::new(), Vec::new()),
+                    |mut current, next| {
+                        if current.1.len() == 0 {
+                            return next;
+                        }
+
+                        current.0 += next.0;
+                        for i in 0..current.1.len() {
+                            current.1[i] += &next.1[i];
+                            current.2[i] += &next.2[i];
+                        }
+
+                        current
+                    },
+                );
+
+            let mut average_weights = Vec::new();
+            let mut average_biases = Vec::new();
+            for i in 0..next_weights.len() {
+                average_weights.push((&next_weights[i] / mini_batch_sample_size as f64).unwrap());
+                average_biases.push((&next_biases[i] / mini_batch_sample_size as f64).unwrap());
             }
-            nn.update_weights(&mut workspace.next_weights, &mut workspace.next_biases);
+
+            nn.update_weights(&mut average_weights, &mut average_biases);
+
+            epoch_error += error;
 
             println!("mini batch count: {}", mini_batch_count);
         }
