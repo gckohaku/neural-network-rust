@@ -1,4 +1,8 @@
-use std::{cell::RefCell, sync::Arc, time};
+use std::{
+    cell::{RefCell, UnsafeCell},
+    sync::Arc,
+    time,
+};
 
 use mnist::MnistBuilder;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -63,6 +67,16 @@ pub fn mnist_process() {
 
     let arc_nn = Arc::new(nn.clone());
 
+    // Arc<NeuralNetwork> を格納するスロットを作成
+    thread_local!(
+        static NN_ARC: UnsafeCell<Option<Arc<FullyConnectedNetwork>>> = UnsafeCell::new(None);
+    );
+
+    //  スレッドローカルなワークスペースを作成
+    thread_local!(
+        static WORKSPACE: UnsafeCell<Option<Arc<NetworkWorkspace>>> = UnsafeCell::new(None);
+    );
+
     // 現在の時刻
     let epochs_now: time::Instant = time::Instant::now();
 
@@ -106,19 +120,42 @@ pub fn mnist_process() {
             //     Matrix::new_from_vec(mini_batch_sample_size, output_node_value, expect_data)
             //         .unwrap();
 
-            //  スレッドローカルなワークスペースを作成
-            thread_local! (
-                pub static WORKSPACE: RefCell<NetworkWorkspace> = RefCell::new(NetworkWorkspace::new_for_network(&nn, 1))
-            );
-
             let (error, next_weights, next_biases) = mini_batch_par_sample
                 .par_iter()
                 .map(|sample| {
-                    let local_nn = Arc::clone(&arc_nn);
+                    // NN_ARC と WORKSPACE が初期化されていなければ初期化する
+                    let local_nn_ref = NN_ARC.with(|nn_cell| {
+                        let nn_slot = unsafe { &mut *nn_cell.get() };
 
-                    let mut workspace = NetworkWorkspace::new_for_network(&nn, 1);
+                        if nn_slot.is_none() {
+                            // Arc::clone() で一度だけ初期化
+                            let cloned_arc = Arc::clone(&arc_nn);
 
-                    local_nn.forward_and_backward(
+                            // 同時に WORKSPACE も初期化
+                            WORKSPACE.with(|ws_cell| {
+                                let ws_slot = unsafe { &mut *ws_cell.get() };
+                                *ws_slot = Some(
+                                    NetworkWorkspace::new_for_network(cloned_arc.as_ref(), 1)
+                                        .into(),
+                                );
+                            });
+
+                            // NN_ARC スロットに格納
+                            *nn_slot = Some(cloned_arc).into();
+                        }
+                        // NN_ARC スロットからネットワーク参照を取り出して利用
+                        nn_slot.as_ref().unwrap()
+                    });
+
+                    // ワークスペースにアクセス (毎回)
+                    let mut workspace = WORKSPACE.with(|ws_cell| {
+                        let ws_slot = unsafe { &mut *ws_cell.get() };
+                        ws_slot.as_mut().unwrap()
+                    });
+
+                    // let local_nn = Arc::clone(&arc_nn);
+
+                    local_nn_ref.forward_and_backward(
                         &Matrix::new_from_vec(1, input_node_value, sample.input.clone()).unwrap(),
                         &Matrix::new_from_vec(1, output_node_value, sample.expect.clone()).unwrap(),
                         &mut workspace,
