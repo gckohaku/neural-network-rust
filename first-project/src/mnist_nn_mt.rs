@@ -1,6 +1,7 @@
 use std::{
     cell::{RefCell, UnsafeCell},
     sync::Arc,
+    thread::current,
     time,
 };
 
@@ -8,6 +9,7 @@ use mnist::MnistBuilder;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
+    constants::MNIST_MT_CHUNK_SIZE,
     fully_connected_network::FullyConnectedNetwork,
     matrix::Matrix,
     neural_network_base::{NetworkWorkspace, NeuralNetwork},
@@ -17,9 +19,9 @@ use crate::{
     utilities::shuffle::generate_shuffle_array,
 };
 
-struct MiniBatchParSample {
-    input: Vec<f64>,
-    expect: Vec<f64>,
+struct MiniBatchParChunk {
+    input: Matrix,
+    expect: Matrix,
 }
 
 pub fn mnist_process() {
@@ -42,7 +44,7 @@ pub fn mnist_process() {
     let output_node_value = nn.get_output_node_value();
 
     let mut r = Rand::new();
-    let mut workspace = NetworkWorkspace::new_for_network(&nn, 1);
+    let mut workspace = NetworkWorkspace::new_for_network(&nn, MNIST_MT_CHUNK_SIZE);
 
     let epoch_value = 10;
 
@@ -74,8 +76,10 @@ pub fn mnist_process() {
 
     //  スレッドローカルなワークスペースを作成
     thread_local!(
-        static WORKSPACE: UnsafeCell<Option<Arc<NetworkWorkspace>>> = UnsafeCell::new(None);
+        static WORKSPACE: UnsafeCell<Option<NetworkWorkspace>> = UnsafeCell::new(None);
     );
+
+    let workspace = NetworkWorkspace::new_for_network(&nn, 1);
 
     // 現在の時刻
     let epochs_now: time::Instant = time::Instant::now();
@@ -85,16 +89,15 @@ pub fn mnist_process() {
         let mut epoch_error = 0.0;
 
         let mut mini_batch_count = 0;
-        let workspace = NetworkWorkspace::new_for_network(&nn, 1);
 
         for indexes in shuffle_index.chunks(mini_batch_sample_size) {
             mini_batch_count += 1;
-            let mut mini_batch_par_sample: Vec<MiniBatchParSample> = Vec::new();
+            let mut mini_batch_par_chunk: Vec<MiniBatchParChunk> = Vec::new();
+            let mut batch_data: Vec<f64> = Vec::new();
+            let mut expect_data: Vec<f64> = Vec::new();
 
+            let mut current_value_in_chunk = 0;
             for index in indexes {
-                let mut batch_data: Vec<f64> = Vec::new();
-                let mut expect_data: Vec<f64> = Vec::new();
-
                 let trn_data: &Vec<f64> = &mnist.trn_img
                     [(*index) * image_dot_value..((*index) + 1) * image_dot_value]
                     .iter()
@@ -108,10 +111,21 @@ pub fn mnist_process() {
                     .collect();
                 expect_data.extend_from_slice(trn_label);
 
-                mini_batch_par_sample.push(MiniBatchParSample {
-                    input: batch_data,
-                    expect: expect_data,
-                });
+                current_value_in_chunk += 1;
+                if current_value_in_chunk == MNIST_MT_CHUNK_SIZE {
+                    mini_batch_par_chunk.push(MiniBatchParChunk {
+                        input: Matrix::new_from_vec(
+                            MNIST_MT_CHUNK_SIZE,
+                            image_dot_value,
+                            batch_data.clone(),
+                        )
+                        .unwrap(),
+                        expect: Matrix::new_from_vec(MNIST_MT_CHUNK_SIZE, 10, expect_data.clone())
+                            .unwrap(),
+                    });
+                    batch_data.clear();
+                    expect_data.clear();
+                }
             }
 
             // let inputs =
@@ -120,7 +134,8 @@ pub fn mnist_process() {
             //     Matrix::new_from_vec(mini_batch_sample_size, output_node_value, expect_data)
             //         .unwrap();
 
-            let (error, next_weights, next_biases) = mini_batch_par_sample
+            // let now = time::Instant::now();
+            let (error, next_weights, next_biases) = mini_batch_par_chunk
                 .par_iter()
                 .map(|sample| {
                     // NN_ARC と WORKSPACE が初期化されていなければ初期化する
@@ -147,25 +162,28 @@ pub fn mnist_process() {
                         nn_slot.as_ref().unwrap()
                     });
 
+                    // let now = time::Instant::now();
+
                     // ワークスペースにアクセス (毎回)
                     let mut workspace = WORKSPACE.with(|ws_cell| {
                         let ws_slot = unsafe { &mut *ws_cell.get() };
                         ws_slot.as_mut().unwrap()
                     });
 
-                    // let local_nn = Arc::clone(&arc_nn);
+                    // let duration = now.elapsed();
+                    // println!("thread time: {:?}", duration);
 
                     local_nn_ref.forward_and_backward(
-                        &Matrix::new_from_vec(1, input_node_value, sample.input.clone()).unwrap(),
-                        &Matrix::new_from_vec(1, output_node_value, sample.expect.clone()).unwrap(),
+                        &sample.input,
+                        &sample.expect,
                         &mut workspace,
                         0.001,
                     );
 
                     (
                         workspace.error,
-                        workspace.next_weights,
-                        workspace.next_biases,
+                        workspace.next_weights.clone(),
+                        workspace.next_biases.clone(),
                     )
                 })
                 .reduce(
@@ -184,6 +202,7 @@ pub fn mnist_process() {
                         current
                     },
                 );
+            // println!("mini batch calc time: {:?}", now.elapsed());
 
             let mut average_weights = Vec::new();
             let mut average_biases = Vec::new();
