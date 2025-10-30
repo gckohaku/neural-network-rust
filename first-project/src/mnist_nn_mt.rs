@@ -1,6 +1,6 @@
 use std::{
     cell::{RefCell, UnsafeCell},
-    sync::Arc,
+    sync::{Arc, Mutex, RwLock},
     thread::current,
     time,
 };
@@ -25,7 +25,13 @@ struct MiniBatchParChunk {
 }
 
 pub fn mnist_process() {
-    let mini_batch_sample_size = 100;
+    let epoch_value = 3;
+    let mini_batch_sample_size = MNIST_MT_CHUNK_SIZE * 16;
+
+    let image_dot_value = 28 * 28;
+    let training_value = mini_batch_sample_size as u32 * 10;
+    let validation_value = 5_000;
+    let test_value = 5_000;
 
     // ニューラルネットワーク初期化
     let mut nn = FullyConnectedNetwork::new(vec![784, 1568, 784, 392, 196, 49, 10], 1);
@@ -46,13 +52,6 @@ pub fn mnist_process() {
     let mut r = Rand::new();
     let mut workspace = NetworkWorkspace::new_for_network(&nn, MNIST_MT_CHUNK_SIZE);
 
-    let epoch_value = 10;
-
-    let image_dot_value = 28 * 28;
-    let training_value = 1_000;
-    let validation_value = 5_000;
-    let test_value = 5_000;
-
     let mnist = MnistBuilder::new()
         .label_format_one_hot()
         .training_set_length(training_value)
@@ -67,11 +66,11 @@ pub fn mnist_process() {
 
     println!("{}", mnist.trn_img.len());
 
-    let arc_nn = Arc::new(nn.clone());
+    let arc_nn = Arc::new(RwLock::new(nn.clone()));
 
     // Arc<NeuralNetwork> を格納するスロットを作成
     thread_local!(
-        static NN_ARC: UnsafeCell<Option<Arc<FullyConnectedNetwork>>> = UnsafeCell::new(None);
+        static NN_ARC: UnsafeCell<Option<Arc<RwLock<FullyConnectedNetwork>>>> = UnsafeCell::new(None);
     );
 
     //  スレッドローカルなワークスペースを作成
@@ -125,6 +124,7 @@ pub fn mnist_process() {
                     });
                     batch_data.clear();
                     expect_data.clear();
+                    current_value_in_chunk = 0;
                 }
             }
 
@@ -150,13 +150,13 @@ pub fn mnist_process() {
                             WORKSPACE.with(|ws_cell| {
                                 let ws_slot = unsafe { &mut *ws_cell.get() };
                                 *ws_slot = Some(
-                                    NetworkWorkspace::new_for_network(cloned_arc.as_ref(), 1)
+                                    NetworkWorkspace::new_for_network(&(*cloned_arc.read().unwrap()), 1)
                                         .into(),
                                 );
                             });
 
                             // NN_ARC スロットに格納
-                            *nn_slot = Some(cloned_arc).into();
+                            *nn_slot = Some(cloned_arc);
                         }
                         // NN_ARC スロットからネットワーク参照を取り出して利用
                         nn_slot.as_ref().unwrap()
@@ -170,14 +170,13 @@ pub fn mnist_process() {
                         ws_slot.as_mut().unwrap()
                     });
 
-                    // let duration = now.elapsed();
-                    // println!("thread time: {:?}", duration);
+                    let read_lock_nn = local_nn_ref.read().unwrap();
 
-                    local_nn_ref.forward_and_backward(
+                    read_lock_nn.forward_and_backward(
                         &sample.input,
                         &sample.expect,
                         &mut workspace,
-                        0.001,
+                        0.0001,
                     );
 
                     (
@@ -187,17 +186,14 @@ pub fn mnist_process() {
                     )
                 })
                 .reduce(
-                    || (0.0, Vec::new(), Vec::new()),
+                    || (0.0, nn.get_zero_weights(),  nn.get_zero_biases()),
                     |mut current, next| {
-                        if current.1.len() == 0 {
-                            return next;
-                        }
-
-                        current.0 += next.0;
                         for i in 0..current.1.len() {
                             current.1[i] += &next.1[i];
                             current.2[i] += &next.2[i];
                         }
+
+                        current.0 += next.0;
 
                         current
                     },
@@ -207,12 +203,20 @@ pub fn mnist_process() {
             let mut average_weights = Vec::new();
             let mut average_biases = Vec::new();
             for i in 0..next_weights.len() {
-                average_weights.push((&next_weights[i] / mini_batch_sample_size as f64).unwrap());
-                average_biases.push((&next_biases[i] / mini_batch_sample_size as f64).unwrap());
+                average_weights.push(
+                    (&next_weights[i]
+                        / (mini_batch_sample_size as f64 / MNIST_MT_CHUNK_SIZE as f64))
+                        .unwrap(),
+                );
+                average_biases.push(
+                    (&next_biases[i]
+                        / (mini_batch_sample_size as f64 / MNIST_MT_CHUNK_SIZE as f64))
+                        .unwrap(),
+                );
             }
 
-            nn.update_weights(&mut average_weights, &mut average_biases);
-
+            let mut write_lock_nn = arc_nn.write().unwrap();
+            write_lock_nn.update_weights(&mut average_weights, &mut average_biases);
             epoch_error += error;
 
             println!("mini batch count: {}", mini_batch_count);

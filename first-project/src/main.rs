@@ -17,6 +17,6 @@ mod mnist_nn_mt;
 mod utilities;
 
 fn main() {
-    // mnist_process();
+    mnist_process();
     mnist_nn_mt::mnist_process();
 }

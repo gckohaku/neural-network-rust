@@ -3,17 +3,17 @@ use std::time;
 use mnist::MnistBuilder;
 
 use crate::{
-    fully_connected_network::FullyConnectedNetwork,
-    matrix::Matrix,
-    neural_network_base::{NetworkWorkspace, NeuralNetwork},
-    neural_network_functions::{differential_relu, relu},
-    output_activation_type::OutputActivationType,
-    rand::Rand,
-    utilities::shuffle::generate_shuffle_array,
+    constants::MNIST_MT_CHUNK_SIZE, fully_connected_network::FullyConnectedNetwork, matrix::Matrix, neural_network_base::{NetworkWorkspace, NeuralNetwork}, neural_network_functions::{differential_relu, relu}, output_activation_type::OutputActivationType, rand::Rand, utilities::shuffle::generate_shuffle_array
 };
 
 pub fn mnist_process() {
-    let mini_batch_sample_size = 100;
+    let epoch_value = 3;
+    let mini_batch_sample_size = MNIST_MT_CHUNK_SIZE * 16;
+
+    let image_dot_value = 28 * 28;
+    let training_value = mini_batch_sample_size as u32 * 10;
+    let validation_value = 5_000;
+    let test_value = 5_000;
 
     // ニューラルネットワーク初期化
     let mut nn = FullyConnectedNetwork::new(
@@ -37,12 +37,7 @@ pub fn mnist_process() {
     let mut r = Rand::new();
     let mut workspace = NetworkWorkspace::new_for_network(&nn, mini_batch_sample_size);
 
-    let epoch_value = 10;
-
-    let image_dot_value = 28 * 28;
-    let training_value = 1_000;
-    let validation_value = 5_000;
-    let test_value = 5_000;
+    
 
     let mnist = MnistBuilder::new()
         .label_format_one_hot()
@@ -93,7 +88,7 @@ pub fn mnist_process() {
                 Matrix::new_from_vec(mini_batch_sample_size, output_node_value, expect_data)
                     .unwrap();
 
-            nn.forward_and_backward(&inputs, &expects, &mut workspace, 0.001);
+            nn.forward_and_backward(&inputs, &expects, &mut workspace, 0.0001);
             epoch_error += workspace.error;
             if (workspace.error.is_nan()) {
                 panic!("error is NaN");
