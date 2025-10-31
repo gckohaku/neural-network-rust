@@ -1,1 +1,5 @@
 .git-old
+target/
+
+# NeuralNetwork .ron data
+first-project/models/ron_data/

@@ -138,14 +138,14 @@ pub fn iris_nn_process() {
                     },
                 );
 
-                let mut average_weights = Vec::new();
-                let mut average_biasese = Vec::new();
-                for i in 0..next_weights.len() {
-                    average_weights.push((&next_weights[i] / mini_batch_sample_size as f64).unwrap());
-                    average_biasese.push((&next_biases[i] / mini_batch_sample_size as f64).unwrap());
-                }
+            let mut average_weights = Vec::new();
+            let mut average_biases = Vec::new();
+            for i in 0..next_weights.len() {
+                average_weights.push((&next_weights[i] / mini_batch_sample_size as f64).unwrap());
+                average_biases.push((&next_biases[i] / mini_batch_sample_size as f64).unwrap());
+            }
 
-            nn.update_weights(&mut average_weights, &mut average_biasese);
+            nn.update_weights(&mut average_weights, &mut average_biases);
 
             epoch_error += error;
         }

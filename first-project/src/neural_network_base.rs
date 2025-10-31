@@ -103,5 +103,27 @@ pub trait NeuralNetwork {
     fn get_input_node_value(&self) -> usize;
     fn get_output_node_value(&self) -> usize;
     fn get_weight_matrix(&self, index: usize) -> &Matrix;
+    fn get_zero_weights(&self) -> Vec<Matrix> {
+        let layer_value = self.get_layer_value();
+        let mut return_weights = Vec::<Matrix>::new();
+
+        for i in 0..layer_value {
+            let current_matrix = self.get_weight_matrix(i);
+            return_weights.push(Matrix::new(current_matrix.rows, current_matrix.cols));
+        }
+
+        return_weights
+    }
+    fn get_zero_biases(&self) -> Vec<Matrix> {
+        let layer_value = self.get_layer_value();
+        let mut return_weights = Vec::<Matrix>::new();
+
+        for i in 0..layer_value {
+            let current_matrix = self.get_weight_matrix(i);
+            return_weights.push(Matrix::new(1, current_matrix.cols));
+        }
+
+        return_weights
+    }
     fn export_ron(&self) -> Result<(), Box<dyn std::error::Error>>;
 }
