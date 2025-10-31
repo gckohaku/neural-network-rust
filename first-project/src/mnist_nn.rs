@@ -8,7 +8,7 @@ use crate::{
 
 pub fn mnist_process() {
     let epoch_value = 3;
-    let mini_batch_sample_size = MNIST_MT_CHUNK_SIZE * 16;
+    let mini_batch_sample_size = MNIST_MT_CHUNK_SIZE * 4;
 
     let image_dot_value = 28 * 28;
     let training_value = mini_batch_sample_size as u32 * 10;
@@ -95,7 +95,7 @@ pub fn mnist_process() {
             }
             nn.update_weights(&mut workspace.next_weights, &mut workspace.next_biases);
 
-            println!("mini batch count: {}", mini_batch_count);
+            print!("\rmini batch count: {}", mini_batch_count);
         }
 
         if (epoch + 1) % 1 == 0 {

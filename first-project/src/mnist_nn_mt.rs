@@ -1,8 +1,5 @@
 use std::{
-    cell::{RefCell, UnsafeCell},
-    sync::{Arc, Mutex, RwLock},
-    thread::current,
-    time,
+    cell::{RefCell, UnsafeCell}, io::{self, Write}, sync::{Arc, Mutex, RwLock}, thread::current, time
 };
 
 use mnist::MnistBuilder;
@@ -24,12 +21,21 @@ struct MiniBatchParChunk {
     expect: Matrix,
 }
 
-pub fn mnist_process() {
-    let epoch_value = 3;
-    let mini_batch_sample_size = MNIST_MT_CHUNK_SIZE * 16;
+pub fn mnist_process(
+    epochs: i32,
+    chunk_size: usize,
+    mini_batch_iteration: usize,
+    training_max_value: u32,
+    validation_max_value: u32,
+    test_max_value: u32,
+) {
+    let epoch_value = epochs;
+    let mini_batch_sample_size: usize = chunk_size * mini_batch_iteration;
 
     let image_dot_value = 28 * 28;
-    let training_value = mini_batch_sample_size as u32 * 10;
+    let training_mini_batch_value = training_max_value / mini_batch_sample_size as u32;
+
+    let training_value = mini_batch_sample_size as u32 * training_mini_batch_value;
     let validation_value = 5_000;
     let test_value = 5_000;
 
@@ -70,7 +76,8 @@ pub fn mnist_process() {
 
     // Arc<NeuralNetwork> を格納するスロットを作成
     thread_local!(
-        static NN_ARC: UnsafeCell<Option<Arc<RwLock<FullyConnectedNetwork>>>> = UnsafeCell::new(None);
+        static NN_ARC: UnsafeCell<Option<Arc<RwLock<FullyConnectedNetwork>>>> =
+            UnsafeCell::new(None);
     );
 
     //  スレッドローカルなワークスペースを作成
@@ -150,8 +157,11 @@ pub fn mnist_process() {
                             WORKSPACE.with(|ws_cell| {
                                 let ws_slot = unsafe { &mut *ws_cell.get() };
                                 *ws_slot = Some(
-                                    NetworkWorkspace::new_for_network(&(*cloned_arc.read().unwrap()), 1)
-                                        .into(),
+                                    NetworkWorkspace::new_for_network(
+                                        &(*cloned_arc.read().unwrap()),
+                                        1,
+                                    )
+                                    .into(),
                                 );
                             });
 
@@ -186,7 +196,7 @@ pub fn mnist_process() {
                     )
                 })
                 .reduce(
-                    || (0.0, nn.get_zero_weights(),  nn.get_zero_biases()),
+                    || (0.0, nn.get_zero_weights(), nn.get_zero_biases()),
                     |mut current, next| {
                         for i in 0..current.1.len() {
                             current.1[i] += &next.1[i];
@@ -219,12 +229,13 @@ pub fn mnist_process() {
             write_lock_nn.update_weights(&mut average_weights, &mut average_biases);
             epoch_error += error;
 
-            println!("mini batch count: {}", mini_batch_count);
+            print!("\rmini batch count: {} / {}", mini_batch_count, training_mini_batch_value);
+            io::stdout().flush().unwrap();
         }
 
         if (epoch + 1) % 1 == 0 {
             println!(
-                "epoch {:6} error: {:13.10}",
+                "\nepoch {:6} error: {:13.10}",
                 epoch + 1,
                 epoch_error / training_value as f64
             );

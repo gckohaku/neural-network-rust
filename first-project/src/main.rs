@@ -1,4 +1,4 @@
-use crate::{iris_nn::{calc_average_and_variance, calc_kurtosis, calc_skewness, iris_nn_process}, mnist_nn::mnist_process};
+use crate::{constants::MNIST_MT_CHUNK_SIZE, iris_nn::{calc_average_and_variance, calc_kurtosis, calc_skewness, iris_nn_process}, mnist_nn::mnist_process};
 
 mod iris_nn;
 mod iris_nn_mt;
@@ -17,6 +17,6 @@ mod mnist_nn_mt;
 mod utilities;
 
 fn main() {
-    mnist_process();
-    mnist_nn_mt::mnist_process();
+    // mnist_process();
+    mnist_nn_mt::mnist_process(3, MNIST_MT_CHUNK_SIZE, 4, 50000, 5000, 5000);
 }
