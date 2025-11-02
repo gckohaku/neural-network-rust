@@ -1,12 +1,14 @@
 use std::{
-    cell::{RefCell, UnsafeCell}, io::{self, Write}, sync::{Arc, Mutex, RwLock}, thread::current, time
+    cell::UnsafeCell,
+    io::{self, Write},
+    sync::{Arc, RwLock},
+    time,
 };
 
 use mnist::MnistBuilder;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
-    constants::MNIST_MT_CHUNK_SIZE,
     fully_connected_network::FullyConnectedNetwork,
     matrix::Matrix,
     neural_network_base::{NetworkWorkspace, NeuralNetwork},
@@ -36,11 +38,11 @@ pub fn mnist_process(
     let training_mini_batch_value = training_max_value / mini_batch_sample_size as u32;
 
     let training_value = mini_batch_sample_size as u32 * training_mini_batch_value;
-    let validation_value = 5_000;
-    let test_value = 5_000;
+    let validation_value = validation_max_value;
+    let test_value = test_max_value;
 
     // ニューラルネットワーク初期化
-    let mut nn = FullyConnectedNetwork::new(vec![784, 1568, 784, 392, 196, 49, 10], 1);
+    let mut nn = FullyConnectedNetwork::new(vec![784, 1024, 640, 160, 40, 10], 1);
     nn.set_activations(&mut vec![relu, relu, relu, relu, relu, relu]);
     nn.set_differential_activation(&mut vec![
         differential_relu,
@@ -56,7 +58,9 @@ pub fn mnist_process(
     let output_node_value = nn.get_output_node_value();
 
     let mut r = Rand::new();
-    let mut workspace = NetworkWorkspace::new_for_network(&nn, MNIST_MT_CHUNK_SIZE);
+    let mut workspace = NetworkWorkspace::new_for_network(&nn, chunk_size);
+    let mut validation_workspace =
+        NetworkWorkspace::new_for_network(&nn, validation_value as usize);
 
     let mnist = MnistBuilder::new()
         .label_format_one_hot()
@@ -118,16 +122,15 @@ pub fn mnist_process(
                 expect_data.extend_from_slice(trn_label);
 
                 current_value_in_chunk += 1;
-                if current_value_in_chunk == MNIST_MT_CHUNK_SIZE {
+                if current_value_in_chunk == chunk_size {
                     mini_batch_par_chunk.push(MiniBatchParChunk {
                         input: Matrix::new_from_vec(
-                            MNIST_MT_CHUNK_SIZE,
+                            chunk_size,
                             image_dot_value,
                             batch_data.clone(),
                         )
                         .unwrap(),
-                        expect: Matrix::new_from_vec(MNIST_MT_CHUNK_SIZE, 10, expect_data.clone())
-                            .unwrap(),
+                        expect: Matrix::new_from_vec(chunk_size, 10, expect_data.clone()).unwrap(),
                     });
                     batch_data.clear();
                     expect_data.clear();
@@ -189,6 +192,10 @@ pub fn mnist_process(
                         0.0001,
                     );
 
+                    if workspace.error.is_nan() {
+                        panic!("error is nan\niteration: {}", mini_batch_count);
+                    }
+
                     (
                         workspace.error,
                         workspace.next_weights.clone(),
@@ -213,23 +220,19 @@ pub fn mnist_process(
             let mut average_weights = Vec::new();
             let mut average_biases = Vec::new();
             for i in 0..next_weights.len() {
-                average_weights.push(
-                    (&next_weights[i]
-                        / (mini_batch_sample_size as f64 / MNIST_MT_CHUNK_SIZE as f64))
-                        .unwrap(),
-                );
-                average_biases.push(
-                    (&next_biases[i]
-                        / (mini_batch_sample_size as f64 / MNIST_MT_CHUNK_SIZE as f64))
-                        .unwrap(),
-                );
+                average_weights.push((&next_weights[i] / mini_batch_iteration as f64).unwrap());
+                average_biases.push((&next_biases[i] / mini_batch_iteration as f64).unwrap());
             }
+            println!("\n{}", mini_batch_iteration);
 
             let mut write_lock_nn = arc_nn.write().unwrap();
             write_lock_nn.update_weights(&mut average_weights, &mut average_biases);
             epoch_error += error;
 
-            print!("\rmini batch count: {} / {}", mini_batch_count, training_mini_batch_value);
+            print!(
+                "\rmini batch count: {} / {}",
+                mini_batch_count, training_mini_batch_value
+            );
             io::stdout().flush().unwrap();
         }
 
@@ -240,10 +243,51 @@ pub fn mnist_process(
                 epoch_error / training_value as f64
             );
         }
+
+        println!("validation test:");
     }
 
     println!(
         "epochs process duration: {:?}sec.",
         epochs_now.elapsed().as_secs_f64()
     );
+}
+
+fn generate_validation_data(
+    img_data: Vec<f32>,
+    lbl_data: Vec<f32>,
+    data_value: usize,
+    chunk_size: usize,
+) -> Vec<MiniBatchParChunk> {
+    let img_data_f64: Vec<f64> = img_data.iter().map(|&x| x as f64).collect();
+    let img_lbl_f64: Vec<f64> = lbl_data.iter().map(|&x| x as f64).collect();
+    let image_dot_value = 28 * 28;
+
+    let mut mini_batch_par_chunk: Vec<MiniBatchParChunk> = Vec::new();
+    let mut batch_data: Vec<f64> = Vec::new();
+    let mut expect_data: Vec<f64> = Vec::new();
+
+    let mut current_value_in_chunk = 0;
+
+    for index in 0..data_value {
+        let single_data = &img_data_f64[index * image_dot_value..(index + 1) * image_dot_value];
+        batch_data.extend_from_slice(single_data);
+
+        let single_label = &img_lbl_f64[index * 10..(index + 1) * 10];
+        expect_data.extend_from_slice(single_label);
+
+        current_value_in_chunk += 1;
+        if current_value_in_chunk == chunk_size {
+            mini_batch_par_chunk.push(MiniBatchParChunk {
+                input: Matrix::new_from_vec(chunk_size, image_dot_value, batch_data.clone())
+                    .unwrap(),
+                expect: Matrix::new_from_vec(chunk_size, 10, expect_data.clone()).unwrap(),
+            });
+            batch_data.clear();
+            expect_data.clear();
+            current_value_in_chunk = 0;
+        }
+    }
+
+    mini_batch_par_chunk
 }

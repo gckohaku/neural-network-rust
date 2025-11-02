@@ -136,6 +136,10 @@ impl NeuralNetwork for FullyConnectedNetwork {
             let ln_output = output_node.hadamard_function(|x| (x + 1e-10).ln());
             workspace.error = -expects.hadamard(&ln_output).unwrap().sum_all_elements();
         }
+        
+        if workspace.error.is_nan() {
+            println!("!!! workspace error is nan !!!\nln_output: {:?}", &output_node);
+        }
 
         // 次に逆伝播を行い、勾配を求める
         // 出力層のデルタ
@@ -225,7 +229,7 @@ impl NeuralNetwork for FullyConnectedNetwork {
         // println!("{}", ron::ser::to_string_pretty(&nn_ron_data, PrettyConfig::new()).unwrap());
 
         std::fs::write(
-            "models/data.ron",
+            "models/ron_data/data.ron",
             ron::ser::to_string_pretty(&nn_ron_data, PrettyConfig::new()).unwrap(),
         )?;
 

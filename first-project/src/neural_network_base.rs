@@ -38,6 +38,7 @@ impl ops::AddAssign<Gradients> for Gradients {
 }
 
 /// ニューラルネットワークの学習に必要な中間データなどを格納する
+#[derive(Debug)]
 pub struct NetworkWorkspace {
     pub layer_inputs: Vec<Matrix>,
     /// layer_outputs は入力層のデータも保持しているため、Vec の長さが 1 長い
@@ -82,6 +83,16 @@ impl NetworkWorkspace {
             error: error,
             next_weights: next_weights,
             next_biases: next_biases,
+        }
+    }
+
+    pub fn change_sample_value(&mut self, sample_value: usize) {
+        self.layer_outputs[0].change_row_size(sample_value);
+
+        for i in 0..self.layer_inputs.len() {
+            self.layer_inputs[i].change_row_size(sample_value);
+            self.layer_outputs[i + 1].change_row_size(sample_value);
+            self.layer_deltas[i + 1].change_row_size(sample_value);
         }
     }
 }
