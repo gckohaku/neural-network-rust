@@ -27,22 +27,27 @@ pub fn mnist_process(
     epochs: i32,
     chunk_size: usize,
     mini_batch_iteration: usize,
+    validation_iteration: usize,
     training_max_value: u32,
     validation_max_value: u32,
     test_max_value: u32,
+    validation_chunk_size: usize,
+    test_chunk_size: usize,
 ) {
     let epoch_value = epochs;
     let mini_batch_sample_size: usize = chunk_size * mini_batch_iteration;
+    let validation_sample_size: usize = validation_chunk_size * validation_iteration;
 
     let image_dot_value = 28 * 28;
     let training_mini_batch_value = training_max_value / mini_batch_sample_size as u32;
+    let validation_mini_batch_value = validation_max_value / validation_sample_size as u32;
 
     let training_value = mini_batch_sample_size as u32 * training_mini_batch_value;
-    let validation_value = validation_max_value;
+    let validation_value = validation_sample_size as u32 * validation_mini_batch_value;
     let test_value = test_max_value;
 
     // ニューラルネットワーク初期化
-    let mut nn = FullyConnectedNetwork::new(vec![784, 1024, 640, 160, 40, 10], 1);
+    let mut nn = FullyConnectedNetwork::new(vec![784, 1568, 784, 392, 196, 49, 10], 1);
     nn.set_activations(&mut vec![relu, relu, relu, relu, relu, relu]);
     nn.set_differential_activation(&mut vec![
         differential_relu,
@@ -192,9 +197,9 @@ pub fn mnist_process(
                         0.0001,
                     );
 
-                    if workspace.error.is_nan() {
-                        panic!("error is nan\niteration: {}", mini_batch_count);
-                    }
+                    // if workspace.error.is_nan() {
+                    //     panic!("error is nan\niteration: {}", mini_batch_count);
+                    // }
 
                     (
                         workspace.error,
@@ -223,7 +228,6 @@ pub fn mnist_process(
                 average_weights.push((&next_weights[i] / mini_batch_iteration as f64).unwrap());
                 average_biases.push((&next_biases[i] / mini_batch_iteration as f64).unwrap());
             }
-            println!("\n{}", mini_batch_iteration);
 
             let mut write_lock_nn = arc_nn.write().unwrap();
             write_lock_nn.update_weights(&mut average_weights, &mut average_biases);
@@ -245,6 +249,13 @@ pub fn mnist_process(
         }
 
         println!("validation test:");
+
+        let samples = generate_validation_data(&mnist.val_img, &mnist.val_lbl, validation_max_value as usize, validation_chunk_size);
+
+        let validation_result = parallel_forward_only(samples, &arc_nn, &NN_ARC, &WORKSPACE);
+
+        println!("collect rate: {}", validation_result.1 as f64 / validation_value as f64);
+        println!("error: {}\n", validation_result.0 / validation_value as f64);
     }
 
     println!(
@@ -254,8 +265,8 @@ pub fn mnist_process(
 }
 
 fn generate_validation_data(
-    img_data: Vec<f32>,
-    lbl_data: Vec<f32>,
+    img_data: &Vec<f32>,
+    lbl_data: &Vec<u8>,
     data_value: usize,
     chunk_size: usize,
 ) -> Vec<MiniBatchParChunk> {
@@ -290,4 +301,81 @@ fn generate_validation_data(
     }
 
     mini_batch_par_chunk
+}
+
+fn parallel_forward_only(
+    samples: Vec<MiniBatchParChunk>,
+    arc_nn: &Arc<RwLock<FullyConnectedNetwork>>,
+    NN_ARC: &'static std::thread::LocalKey<UnsafeCell<Option<Arc<RwLock<FullyConnectedNetwork>>>>>,
+    WORKSPACE: &'static std::thread::LocalKey<UnsafeCell<Option<NetworkWorkspace>>>,
+) -> (f64, usize) {
+    let result = samples
+        .par_iter()
+        .map(|sample| {
+            // NN_ARC と WORKSPACE が初期化されていなければ初期化する
+            let local_nn_ref = NN_ARC.with(|nn_cell| {
+                let nn_slot = unsafe { &mut *nn_cell.get() };
+
+                if nn_slot.is_none() {
+                    // Arc::clone() で一度だけ初期化
+                    let cloned_arc = Arc::clone(&arc_nn);
+
+                    // 同時に WORKSPACE も初期化
+                    WORKSPACE.with(|ws_cell| {
+                        let ws_slot = unsafe { &mut *ws_cell.get() };
+                        *ws_slot = Some(
+                            NetworkWorkspace::new_for_network(&(*cloned_arc.read().unwrap()), 1)
+                                .into(),
+                        );
+                    });
+
+                    // NN_ARC スロットに格納
+                    *nn_slot = Some(cloned_arc);
+                }
+                // NN_ARC スロットからネットワーク参照を取り出して利用
+                nn_slot.as_ref().unwrap()
+            });
+
+            // let now = time::Instant::now();
+
+            // ワークスペースにアクセス (毎回)
+            let mut workspace = WORKSPACE.with(|ws_cell| {
+                let ws_slot = unsafe { &mut *ws_cell.get() };
+                ws_slot.as_mut().unwrap()
+            });
+
+            let read_lock_nn = local_nn_ref.read().unwrap();
+
+            read_lock_nn.forward_only(&sample.input, &sample.expect, &mut workspace);
+
+            let mut collect_value = 0;
+
+            let outputs = workspace.layer_outputs.last().unwrap();
+
+            for i in 0..outputs.rows {
+                let row = outputs.get_row(i).unwrap();
+                let (most_index, _) = row.iter().enumerate().fold(
+                    (0, f64::MIN),
+                    |(idx_a, val_a), (idx_b, &val_b)| {
+                        if val_b > val_a {
+                            (idx_b, val_b)
+                        } else {
+                            (idx_a, val_a)
+                        }
+                    },
+                );
+
+                if sample.expect[i][most_index] == 1.0 {
+                    collect_value += 1;
+                }
+            }
+
+            (workspace.error, collect_value)
+        })
+        .reduce(
+            || (0.0, 0usize),
+            |current, next| (current.0 + next.0, current.1 + next.1),
+        );
+
+    result
 }

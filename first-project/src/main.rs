@@ -21,13 +21,16 @@ mod ron_data;
 mod utilities;
 
 fn main() {
-    let epochs = 3;
-    let chunk_size = 250;
+    let epochs = 10;
+    let learning_chunk_size = 250;
     let mini_batch_iteration = 16;
+    let validation_iteration = 30;
     let training_max_value = 60000;
     let validation_max_value = 9000;
     let test_max_value = 1000;
+    let validation_chunk_size = 300;
+    let test_chunk_size = 100;
 
     // mnist_process();
-    mnist_nn_mt::mnist_process(epochs, chunk_size, mini_batch_iteration, training_max_value, validation_max_value, test_max_value);
+    mnist_nn_mt::mnist_process(epochs, learning_chunk_size, mini_batch_iteration, validation_iteration, training_max_value, validation_max_value, test_max_value, validation_chunk_size, test_chunk_size);
 }
