@@ -50,7 +50,7 @@ pub fn mnist_process(
     let test_value = test_sample_size as u32 * test_mini_batch_value;
 
     // ニューラルネットワーク初期化
-    let mut nn = FullyConnectedNetwork::new(vec![784, 1568, 784, 392, 196, 49, 10], 1);
+    let mut nn = FullyConnectedNetwork::new(vec![784, 196, 49, 10], 1);
     nn.set_activations(&mut vec![relu, relu, relu, relu, relu, relu]);
     nn.set_differential_activation(&mut vec![
         differential_relu,
@@ -268,7 +268,7 @@ pub fn mnist_process(
 
     let test_result = parallel_forward_only(test_samples, &arc_nn, &NN_ARC, &WORKSPACE);
 
-    println!("collect rate: {}", test_result.1 as f64 / validation_value as f64);
+    println!("collect rate: {}", test_result.1 as f64 / test_value as f64);
     println!("              ({} / {})", test_result.1, test_value);
     println!("error: {}\n", test_result.0 / test_value as f64);
 
