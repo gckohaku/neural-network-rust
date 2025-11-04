@@ -28,6 +28,7 @@ pub fn mnist_process(
     chunk_size: usize,
     mini_batch_iteration: usize,
     validation_iteration: usize,
+    test_iteration: usize,
     training_max_value: u32,
     validation_max_value: u32,
     test_max_value: u32,
@@ -37,14 +38,16 @@ pub fn mnist_process(
     let epoch_value = epochs;
     let mini_batch_sample_size: usize = chunk_size * mini_batch_iteration;
     let validation_sample_size: usize = validation_chunk_size * validation_iteration;
+    let test_sample_size: usize = test_chunk_size * test_iteration;
 
     let image_dot_value = 28 * 28;
     let training_mini_batch_value = training_max_value / mini_batch_sample_size as u32;
     let validation_mini_batch_value = validation_max_value / validation_sample_size as u32;
+    let test_mini_batch_value = test_max_value / test_sample_size as u32;
 
     let training_value = mini_batch_sample_size as u32 * training_mini_batch_value;
     let validation_value = validation_sample_size as u32 * validation_mini_batch_value;
-    let test_value = test_max_value;
+    let test_value = test_sample_size as u32 * test_mini_batch_value;
 
     // ニューラルネットワーク初期化
     let mut nn = FullyConnectedNetwork::new(vec![784, 1568, 784, 392, 196, 49, 10], 1);
@@ -250,13 +253,24 @@ pub fn mnist_process(
 
         println!("validation test:");
 
-        let samples = generate_validation_data(&mnist.val_img, &mnist.val_lbl, validation_max_value as usize, validation_chunk_size);
+        let samples = generate_validation_data(&mnist.val_img, &mnist.val_lbl, validation_value as usize, validation_chunk_size);
 
         let validation_result = parallel_forward_only(samples, &arc_nn, &NN_ARC, &WORKSPACE);
 
         println!("collect rate: {}", validation_result.1 as f64 / validation_value as f64);
+        println!("              ({} / {})", validation_result.1, validation_value);
         println!("error: {}\n", validation_result.0 / validation_value as f64);
     }
+
+    println!("after leaning test:");
+
+    let test_samples = generate_validation_data(&mnist.tst_img, &mnist.tst_lbl, test_value as usize, test_chunk_size);
+
+    let test_result = parallel_forward_only(test_samples, &arc_nn, &NN_ARC, &WORKSPACE);
+
+    println!("collect rate: {}", test_result.1 as f64 / validation_value as f64);
+    println!("              ({} / {})", test_result.1, test_value);
+    println!("error: {}\n", test_result.0 / test_value as f64);
 
     println!(
         "epochs process duration: {:?}sec.",
