@@ -21,7 +21,7 @@ mod ron_data;
 mod utilities;
 
 fn main() {
-    let epochs = 10;
+    let epochs = 20;
     let learning_chunk_size = 250;
     let mini_batch_iteration = 16;
     let validation_iteration = 30;
