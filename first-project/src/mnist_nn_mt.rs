@@ -268,7 +268,7 @@ pub fn mnist_process(
 
     let test_result = parallel_forward_only(test_samples, &arc_nn, &NN_ARC, &WORKSPACE);
 
-    println!("collect rate: {}", test_result.1 as f64 / validation_value as f64);
+    println!("collect rate: {}", test_result.1 as f64 / test_value as f64);
     println!("              ({} / {})", test_result.1, test_value);
     println!("error: {}\n", test_result.0 / test_value as f64);
 
