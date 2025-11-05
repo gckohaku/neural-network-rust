@@ -50,7 +50,7 @@ pub fn mnist_process(
     let test_value = test_sample_size as u32 * test_mini_batch_value;
 
     // ニューラルネットワーク初期化
-    let mut nn = FullyConnectedNetwork::new(vec![784, 196, 49, 10], 1);
+    let mut nn = FullyConnectedNetwork::new(vec![784, 397, 10], 1);
     nn.set_activations(&mut vec![relu, relu, relu, relu, relu, relu]);
     nn.set_differential_activation(&mut vec![
         differential_relu,
@@ -197,7 +197,7 @@ pub fn mnist_process(
                         &sample.input,
                         &sample.expect,
                         &mut workspace,
-                        0.001,
+                        0.01,
                     );
 
                     // if workspace.error.is_nan() {
