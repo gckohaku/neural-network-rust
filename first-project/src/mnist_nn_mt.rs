@@ -272,6 +272,11 @@ pub fn mnist_process(
         );
         println!("error: {}\n", validation_result.0 / validation_value as f64);
     }
+
+    println!(
+        "epochs process duration: {:?}sec.",
+        epochs_now.elapsed().as_secs_f64()
+    );
 }
 
 fn generate_validation_data(
