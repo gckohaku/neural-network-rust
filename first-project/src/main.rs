@@ -27,8 +27,8 @@ fn main() {
     let validation_iteration = 10;
     let test_iteration = 10;
     let training_max_value = 60000;
-    let validation_max_value = 5000;
-    let test_max_value = 5000;
+    let validation_max_value = 10000;
+    let test_max_value = 0;
     let validation_chunk_size = 500;
     let test_chunk_size = 500;
 

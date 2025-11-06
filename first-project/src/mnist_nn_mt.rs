@@ -74,7 +74,6 @@ pub fn mnist_process(
         .label_format_one_hot()
         .training_set_length(training_value)
         .validation_set_length(validation_value)
-        .test_set_length(test_value)
         .training_images_filename("train-images.idx3-ubyte")
         .training_labels_filename("train-labels.idx1-ubyte")
         .test_images_filename("t10k-images.idx3-ubyte")
@@ -261,21 +260,6 @@ pub fn mnist_process(
         println!("              ({} / {})", validation_result.1, validation_value);
         println!("error: {}\n", validation_result.0 / validation_value as f64);
     }
-
-    println!("after leaning test:");
-
-    let test_samples = generate_validation_data(&mnist.tst_img, &mnist.tst_lbl, test_value as usize, test_chunk_size);
-
-    let test_result = parallel_forward_only(test_samples, &arc_nn, &NN_ARC, &WORKSPACE);
-
-    println!("collect rate: {}", test_result.1 as f64 / test_value as f64);
-    println!("              ({} / {})", test_result.1, test_value);
-    println!("error: {}\n", test_result.0 / test_value as f64);
-
-    println!(
-        "epochs process duration: {:?}sec.",
-        epochs_now.elapsed().as_secs_f64()
-    );
 }
 
 fn generate_validation_data(
