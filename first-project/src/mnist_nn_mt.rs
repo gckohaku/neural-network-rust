@@ -197,7 +197,7 @@ pub fn mnist_process(
                         &sample.input,
                         &sample.expect,
                         &mut workspace,
-                        0.003 - (0.0025 * (epoch as f64) / (epoch_value - 1) as f64),
+                        0.003 - (0.0028 * (epoch as f64) / (epoch_value - 1) as f64),
                     );
 
                     // if workspace.error.is_nan() {
