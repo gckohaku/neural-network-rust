@@ -24,12 +24,12 @@ fn main() {
     let epochs = 20;
     let learning_chunk_size = 250;
     let mini_batch_iteration = 16;
-    let validation_iteration = 10;
+    let validation_iteration = 16;
     let test_iteration = 10;
     let training_max_value = 60000;
     let validation_max_value = 10000;
     let test_max_value = 0;
-    let validation_chunk_size = 500;
+    let validation_chunk_size = 625;
     let test_chunk_size = 500;
 
     // mnist_process();
