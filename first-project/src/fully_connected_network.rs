@@ -33,14 +33,14 @@ impl NeuralNetwork for FullyConnectedNetwork {
             if i > 0 {
                 // 重み行列のサイズは 直前の層のノードの数 x 現在の層のノードの数
                 let mut layer_weights = Matrix::new(nodes_values[i - 1], nodes_values[i]);
-                // 重み行列を He 初期化する
+                // 重み行列を Xavier 初期化する
                 for row in 0..layer_weights.rows {
                     for col in 0..layer_weights.cols {
                         layer_weights
                             .set(
                                 row,
                                 col,
-                                r.normal(0.0, (2.0 / nodes_values[i - 1] as f64).sqrt()),
+                                r.normal(0.0, 1.0 / (nodes_values[i - 1] as f64).sqrt()),
                             )
                             .unwrap();
                     }

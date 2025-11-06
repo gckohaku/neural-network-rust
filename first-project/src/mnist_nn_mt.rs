@@ -12,7 +12,7 @@ use crate::{
     fully_connected_network::FullyConnectedNetwork,
     matrix::Matrix,
     neural_network_base::{NetworkWorkspace, NeuralNetwork},
-    neural_network_functions::{differential_relu, relu},
+    neural_network_functions::{differential_relu, relu, sigmoid, differential_sigmoid},
     output_activation_type::OutputActivationType,
     rand::Rand,
     utilities::shuffle::generate_shuffle_array,
@@ -51,14 +51,14 @@ pub fn mnist_process(
 
     // ニューラルネットワーク初期化
     let mut nn = FullyConnectedNetwork::new(vec![784, 196, 49, 10], 1);
-    nn.set_activations(&mut vec![relu, relu, relu, relu, relu, relu]);
+    nn.set_activations(&mut vec![sigmoid, sigmoid, sigmoid, sigmoid, sigmoid, sigmoid]);
     nn.set_differential_activation(&mut vec![
-        differential_relu,
-        differential_relu,
-        differential_relu,
-        differential_relu,
-        differential_relu,
-        differential_relu,
+        differential_sigmoid,
+        differential_sigmoid,
+        differential_sigmoid,
+        differential_sigmoid,
+        differential_sigmoid,
+        differential_sigmoid,
     ]);
     nn.set_output_activation_type(OutputActivationType::SoftmaxAndCrossEntropy);
 
